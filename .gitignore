@@ -1,0 +1,43 @@
+# NOTE: `databricks bundle deploy` also respects this file — anything ignored here is
+# NOT uploaded to the workspace. Do not add broad patterns like *.yml or *.json.
+
+# Databricks CLI / bundle state
+.databricks/
+.databricks-login.json
+
+# Data. MEMD-ABSA has no upstream licence file, so it is downloaded at run time, never committed.
+data/
+*.jsonl
+*.parquet
+
+# MLflow local artefacts
+mlruns/
+mlartifacts/
+*.db
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secrets (nothing here should ever exist)
+.env
+.env.*
+*.pem
+.databrickscfg
+databricks.cfg
+
+# Office drafts and cohort material, which belong in the private working folder
+*.docx
+*.pptx
+*Cohort*.pdf
+*Capstone Project Specification*.pdf
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,61 @@
+# Project Juno — Databricks Asset Bundle
+#
+# The catalog, schema and volume are deliberately NOT bundle resources. In development mode the
+# bundle prefixes resource names per user (juno.dev_tamaghna_restaurant), and `bundle destroy`
+# would drop the only copy of the data. They are created once with the CLI; sql/00_setup.sql
+# records the equivalent DDL.
+
+bundle:
+  name: juno
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog holding Juno's data, models and index.
+    default: juno
+  schema:
+    description: Schema inside the catalog.
+    default: restaurant
+  volume:
+    description: Volume holding the raw MEMD-ABSA download.
+    default: raw
+  warehouse_id:
+    description: Serverless SQL warehouse used for ai_query batch tagging and evaluation SQL.
+    lookup:
+      warehouse: Serverless Starter Warehouse
+  vs_endpoint:
+    description: Vector Search endpoint name (created in step 4, deleted after the demo).
+    default: juno-vs
+  tagging_model:
+    description: Chat endpoint used by ai_query to tag every sentence.
+    default: databricks-gpt-oss-120b
+  agent_model:
+    description: Chat endpoint used by approach A and the Juno agent.
+    default: databricks-claude-sonnet-5
+  judge_model:
+    description: Chat endpoint used by the LLM judge; deliberately a different model from the agent.
+    default: databricks-claude-opus-5
+  embedding_model:
+    description: Embedding endpoint backing the Delta Sync index.
+    default: databricks-gte-large-en
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-7405619094170579.19.azuredatabricks.net
+
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-7405619094170579.19.azuredatabricks.net
+      # A user-scoped path; /Workspace/Shared would be writable by every workspace user.
+      root_path: /Workspace/Users/tamaghna.banerjee@gmail.com/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      user_name: tamaghna.banerjee@gmail.com
+    permissions:
+      - user_name: tamaghna.banerjee@gmail.com
+        level: CAN_MANAGE

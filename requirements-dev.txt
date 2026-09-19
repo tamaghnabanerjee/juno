@@ -1,0 +1,7 @@
+# Local authoring and testing only. The notebooks install their own dependencies
+# with %pip inside the workspace, and the app has its own requirements.txt.
+databricks-sdk>=0.68
+mlflow>=3.6
+pytest>=8.0
+ruff>=0.14
+pyyaml>=6.0
