@@ -46,12 +46,12 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://adb-7405619094170579.19.azuredatabricks.net
+      host: https://adb-7405616821600861.1.azuredatabricks.net
 
   prod:
     mode: production
     workspace:
-      host: https://adb-7405619094170579.19.azuredatabricks.net
+      host: https://adb-7405616821600861.1.azuredatabricks.net
       # A user-scoped path; /Workspace/Shared would be writable by every workspace user.
       root_path: /Workspace/Users/tamaghna.banerjee@gmail.com/.bundle/${bundle.name}/${bundle.target}
     run_as:

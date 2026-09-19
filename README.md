@@ -29,6 +29,7 @@ the failure analysis land here as they are produced.
 
 | Path | Contents |
 |---|---|
+| `infra/` | One-command setup of the workspace, storage and Unity Catalog objects |
 | `databricks.yml`, `resources/` | Databricks Asset Bundle: jobs, and later the index and app |
 | `src/juno/` | Importable core: config, counting, retrieval, baseline, agent |
 | `src/notebooks/` | Notebooks run by the jobs, in Databricks source format |
@@ -39,20 +40,24 @@ the failure analysis land here as they are produced.
 
 ## Running it
 
-Prerequisites: Databricks CLI v1.9.0+ authenticated against a workspace with Unity Catalog, a
-serverless SQL warehouse, and Vector Search.
+Prerequisites: the [az CLI](https://learn.microsoft.com/cli/azure/) logged in to an Azure
+subscription, and the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/) v1.9.0+.
 
 ```bash
-# one-off: create the catalog, schema and volume (see sql/00_setup.sql for the equivalent DDL)
-databricks catalogs create juno
-databricks schemas create restaurant juno
-databricks volumes create juno restaurant raw MANAGED
+# one-off: workspace, storage, access connector, catalog, schema, volume
+./infra/setup.sh azure           # Azure resources (10-15 min)
+./infra/setup.sh login           # prints the sign-in command to run
+./infra/setup.sh unity           # Unity Catalog objects on the new storage
+./infra/setup.sh verify          # checks everything is usable
 
 # deploy and run
-databricks bundle validate
-databricks bundle deploy -t dev
-databricks bundle run ingest -t dev
+databricks -p JUNO bundle validate
+databricks -p JUNO bundle deploy -t dev
+databricks -p JUNO bundle run ingest -t dev
 ```
+
+See [infra/README.md](infra/README.md) for what the setup creates, what it costs, and how to tear it
+down. `sql/00_setup.sql` holds the same catalog DDL for anyone who prefers a SQL editor.
 
 ## Licence
 
