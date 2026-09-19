@@ -59,6 +59,14 @@ databricks -p JUNO bundle run ingest -t dev
 See [infra/README.md](infra/README.md) for what the setup creates, what it costs, and how to tear it
 down. `sql/00_setup.sql` holds the same catalog DDL for anyone who prefers a SQL editor.
 
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/data-model.md](docs/data-model.md) | Every table, which notebook writes it, and which are used for answering versus grading |
+| [docs/setup-walkthrough.md](docs/setup-walkthrough.md) | How the environment was built, step by step, and why each piece exists |
+| [docs/design-doc.pdf](docs/design-doc.pdf) | The submitted design document |
+
 ## Licence
 
 MIT, see [LICENSE](LICENSE). The MEMD-ABSA dataset is the property of its authors and is not
