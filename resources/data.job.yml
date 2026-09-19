@@ -1,8 +1,8 @@
 resources:
   jobs:
-    ingest:
-      name: juno-ingest
-      description: Download MEMD-ABSA Restaurant into the volume, then build the bronze and silver tables.
+    data:
+      name: juno-data
+      description: Download MEMD-ABSA Restaurant (bronze), then curate the silver tables.
       tags:
         project: juno
       queue:
@@ -20,3 +20,9 @@ resources:
         - task_key: ingest
           notebook_task:
             notebook_path: ../src/notebooks/01_ingest.py
+        - task_key: curate
+          # Curation only runs if the download and bronze load succeeded.
+          depends_on:
+            - task_key: ingest
+          notebook_task:
+            notebook_path: ../src/notebooks/02_curate.py
