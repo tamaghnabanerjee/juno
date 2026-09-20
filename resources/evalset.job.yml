@@ -1,0 +1,24 @@
+resources:
+  jobs:
+    evalset:
+      name: juno-evalset
+      description: >-
+        Build the frozen evaluation question set with answers computed from the human labels.
+        Deliberately separate from juno-data: rebuilding the tables must never regenerate the
+        questions by accident. Generation is deterministic, so a re-run reproduces the same set.
+      tags:
+        project: juno
+      queue:
+        enabled: true
+      performance_target: STANDARD
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: volume
+          default: ${var.volume}
+      tasks:
+        - task_key: eval_set
+          notebook_task:
+            notebook_path: ../src/notebooks/03_eval_set.py

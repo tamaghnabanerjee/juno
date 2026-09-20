@@ -44,6 +44,10 @@ class Config:
         return f"{self.prefix}.review_facts"
 
     @property
+    def eval_questions(self) -> str:
+        return f"{self.prefix}.eval_questions"
+
+    @property
     def index(self) -> str:
         return f"{self.prefix}.sentences_index"
 
