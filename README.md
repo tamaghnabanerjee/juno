@@ -63,6 +63,7 @@ down. `sql/00_setup.sql` holds the same catalog DDL for anyone who prefers a SQL
 
 | Document | What it covers |
 |---|---|
+| [docs/reference.md](docs/reference.md) | Start here: the idea, every table and column, every file, and where things stand |
 | [docs/data-model.md](docs/data-model.md) | Every table, which notebook writes it, and which are used for answering versus grading |
 | [docs/setup-walkthrough.md](docs/setup-walkthrough.md) | How the environment was built, step by step, and why each piece exists |
 | [docs/design-doc.pdf](docs/design-doc.pdf) | The submitted design document |
