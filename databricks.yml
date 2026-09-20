@@ -29,8 +29,11 @@ variables:
     description: Vector Search endpoint name (created in step 4, deleted after the demo).
     default: juno-vs
   tagging_model:
-    description: Chat endpoint used by ai_query to tag every sentence.
-    default: databricks-gpt-oss-120b
+    description: >-
+      Chat endpoint used by ai_query to tag every sentence. Two candidates are compared; each trial
+      names its model. The default is the cheaper candidate, so a run started without naming a model
+      never calls the dearer one by accident.
+    default: databricks-meta-llama-3-3-70b-instruct
   agent_model:
     description: Chat endpoint used by approach A and the Juno agent.
     default: databricks-claude-sonnet-5

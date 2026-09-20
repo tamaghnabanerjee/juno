@@ -17,7 +17,7 @@ class Config:
     volume: str = os.environ.get("JUNO_VOLUME", "raw")
 
     vs_endpoint: str = os.environ.get("JUNO_VS_ENDPOINT", "juno-vs")
-    tagging_model: str = os.environ.get("JUNO_TAGGING_MODEL", "databricks-gpt-oss-120b")
+    tagging_model: str = os.environ.get("JUNO_TAGGING_MODEL", "databricks-meta-llama-3-3-70b-instruct")
     agent_model: str = os.environ.get("JUNO_AGENT_MODEL", "databricks-claude-sonnet-5")
     judge_model: str = os.environ.get("JUNO_JUDGE_MODEL", "databricks-claude-opus-5")
     embedding_model: str = os.environ.get("JUNO_EMBEDDING_MODEL", "databricks-gte-large-en")

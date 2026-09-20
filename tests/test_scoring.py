@@ -1,10 +1,12 @@
 import pytest
 
 from juno.scoring import (
+    Checkpoint1,
     Score,
     by_category,
+    checkpoint1,
     macro_f1,
-    passes_gate,
+    pick_winner,
     relative_error,
     score,
 )
@@ -64,30 +66,116 @@ def test_relative_error_signs_and_edges():
     assert relative_error(5, 0) == float("inf")
 
 
-def test_gate_passes_when_counts_and_f1_are_good():
+# Every pair below has plenty of sentences, so nothing is skipped unless a test says otherwise.
+def _plenty(errors):
+    return {pair: 100 for pair in errors}
+
+
+def test_checkpoint1_passes_when_counts_and_f1_are_good():
     # Four of five pairs within tolerance is exactly the 80% bar.
     errors = {
         ("a", "NEG"): 0.02, ("b", "POS"): -0.05, ("c", "NEG"): 0.09,
         ("d", "POS"): 0.08, ("e", "NEG"): 0.30,
     }
     scores = {"a": Score(8, 2, 2), "b": Score(8, 2, 2)}  # f1 = 0.8
-    ok, lines = passes_gate(errors, scores)
-    assert ok, lines
-    assert all(line.startswith("ok") for line in lines)
+    result = checkpoint1(errors, _plenty(errors), scores)
+    assert result.passed, result.lines()
+    assert (result.ticks, len(result.marked), len(result.skipped)) == (4, 5, 0)
+    assert all(line.startswith("ok") for line in result.lines())
 
 
-def test_gate_fails_on_count_error_even_with_good_f1():
+def test_checkpoint1_fails_on_count_error_even_with_good_f1():
     errors = {("a", "NEG"): 0.4, ("b", "POS"): 0.5, ("c", "NEG"): 0.02, ("d", "POS"): 0.01}
     scores = {"a": Score(9, 1, 1)}
-    ok, lines = passes_gate(errors, scores)
-    assert not ok
-    assert any("count error" in line and line.startswith("FAIL") for line in lines)
+    result = checkpoint1(errors, _plenty(errors), scores)
+    assert not result.passed
+    assert not result.counts_ok and result.f1_ok
+    assert any("count within" in line and line.startswith("FAIL") for line in result.lines())
 
 
-def test_gate_fails_on_low_f1_even_when_counts_look_fine():
+def test_checkpoint1_fails_on_low_f1_even_when_counts_look_fine():
     # Misses and false positives cancel out, so the count is right for the wrong reasons.
     errors = {("a", "NEG"): 0.0, ("b", "POS"): 0.0}
     scores = {"a": Score(tp=2, fp=8, fn=8)}
-    ok, lines = passes_gate(errors, scores)
-    assert not ok
-    assert any("macro-F1" in line and line.startswith("FAIL") for line in lines)
+    result = checkpoint1(errors, _plenty(errors), scores)
+    assert not result.passed
+    assert result.counts_ok and not result.f1_ok
+    assert any("average F1" in line and line.startswith("FAIL") for line in result.lines())
+
+
+def test_small_questions_are_skipped_not_failed():
+    # The design's own case: a good tagger is off by 2 on a 10-sentence question (20%). Marked, that
+    # cross would sink it; skipped, it does not count either way.
+    errors = {("big", "POS"): 0.02, ("big", "NEG"): -0.04, ("small", "POS"): 0.20}
+    support = {("big", "POS"): 550, ("big", "NEG"): 136, ("small", "POS"): 10}
+    scores = {"big": Score(8, 2, 2)}
+    result = checkpoint1(errors, support, scores)
+    assert result.marked == (("big", "NEG"), ("big", "POS"))
+    assert result.skipped == (("small", "POS"),)
+    assert result.ticks == 2 and result.passed
+
+
+def test_thirty_sentences_is_marked_and_twenty_nine_is_not():
+    errors = {("a", "POS"): 0.0, ("b", "POS"): 0.0}
+    result = checkpoint1(errors, {("a", "POS"): 30, ("b", "POS"): 29}, {"a": Score(8, 2, 2)})
+    assert result.marked == (("a", "POS"),)
+    assert result.skipped == (("b", "POS"),)
+
+
+def test_a_question_missing_from_the_support_map_is_skipped():
+    errors = {("a", "POS"): 0.0}
+    assert checkpoint1(errors, {}, {"a": Score(8, 2, 2)}).skipped == (("a", "POS"),)
+
+
+def test_nothing_big_enough_to_mark_is_not_a_pass():
+    errors = {("a", "POS"): 0.0}
+    result = checkpoint1(errors, {("a", "POS"): 5}, {"a": Score(9, 1, 1)})
+    assert not result.counts_ok and not result.passed
+
+
+def _trial(ticks, f1, marked=10):
+    pairs = tuple((f"q{i}", "POS") for i in range(marked))
+    return Checkpoint1(ticks=ticks, marked=pairs, skipped=(), macro_f1=f1)
+
+
+ORDER = ["preferred", "open"]
+
+
+def test_winner_step_1_passing_beats_failing_even_with_a_lower_f1():
+    results = {"preferred": _trial(7, 0.90), "open": _trial(8, 0.61)}  # 7 of 10 fails condition 1
+    winner, reason = pick_winner(results, ORDER)
+    assert winner == "open" and reason.startswith("step 1")
+
+
+def test_winner_step_2_higher_f1_beats_more_ticks():
+    # The made-up case in design.md section 7: X has 9 ticks and 0.61, Y has 8 ticks and 0.70.
+    results = {"preferred": _trial(9, 0.61), "open": _trial(8, 0.70)}
+    winner, reason = pick_winner(results, ORDER)
+    assert winner == "open" and reason.startswith("step 2")
+
+
+def test_winner_step_2_also_applies_when_neither_passes():
+    results = {"preferred": _trial(5, 0.40), "open": _trial(6, 0.55)}
+    winner, reason = pick_winner(results, ORDER)
+    assert winner == "open" and reason.startswith("step 2")
+
+
+def test_winner_step_3_ticks_decide_when_f1_is_equal_to_two_places():
+    results = {"preferred": _trial(8, 0.662), "open": _trial(9, 0.658)}  # both round to 0.66
+    winner, reason = pick_winner(results, ORDER)
+    assert winner == "open" and reason.startswith("step 3")
+
+
+def test_winner_step_4_preferred_order_is_the_last_resort():
+    results = {"open": _trial(9, 0.66), "preferred": _trial(9, 0.66)}
+    winner, reason = pick_winner(results, ORDER)
+    assert winner == "preferred" and reason.startswith("step 4")
+
+
+def test_winner_with_one_model_says_so():
+    assert pick_winner({"open": _trial(9, 0.66)}, ORDER) == ("open", "the only model tried")
+
+
+def test_winner_refuses_a_model_with_no_place_in_the_preferred_order():
+    with pytest.raises(ValueError, match="no preferred order"):
+        pick_winner({"stranger": _trial(9, 0.66)}, ORDER)

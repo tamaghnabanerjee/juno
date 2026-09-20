@@ -1,0 +1,39 @@
+resources:
+  jobs:
+    # Two jobs on purpose: this one and tagging_full.job.yml. A passing trial must never start the full run by itself: two models are
+    # compared on the trial first, and a winner is picked, before anything is labelled in full
+    # (docs/design.md section 7).
+    tagging_trial:
+      name: juno-tagging-trial
+      description: >-
+        Label the first trial_size sentences with one model and hold checkpoint 1. Saves one row to
+        tagging_trials. Run once per model, with identical instructions, to compare them. A failed
+        checkpoint is a result, not a crash.
+      tags:
+        project: juno
+      queue:
+        enabled: true
+      performance_target: STANDARD
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: model
+          default: ${var.tagging_model}
+        - name: trial_size
+          default: "1500"
+        # Empty means the current version in src/juno/tagging.py.
+        - name: instructions_version
+          default: ""
+        # Last tie-break when the two candidates are compared (docs/design.md section 7). Both
+        # names were checked against this workspace on 2026-09-20: both exist and both are accepted
+        # by the bulk function.
+        - name: preferred_order
+          default: "databricks-claude-opus-4-8,databricks-meta-llama-3-3-70b-instruct"
+      tasks:
+        - task_key: trial
+          notebook_task:
+            notebook_path: ../src/notebooks/04_tagging.py
+            base_parameters:
+              stage: trial

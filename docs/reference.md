@@ -124,7 +124,21 @@ Also exported to `eval/questions.json` so a reviewer without workspace access ca
 **Not built yet.** Same grain as `human_labels`, but produced by an LLM instead of people — and
 **this is the table Juno counts**. Matching grain is what makes the comparison meaningful.
 
-Planned columns: `sentence_id`, `category`, `sentiment`, `confidence`, `tagged_at`.
+Columns: `sentence_id`, `category`, `sentiment`, `model`, `instructions_version`, `tagged_at`. The
+last three record which model and which version of the instructions produced the labels.
+**Written by:** `04_tagging.py` with `stage = full`, once. How the labels are checked before and
+after is set out in [design.md](design.md).
+
+## Tables that record how far the labels can be trusted 📋 step 3
+
+**None built yet.** All written by `04_tagging.py`.
+
+| Table | Rows | What it holds |
+|---|---|---|
+| `tagging_trials` | One per trial run | Model, instructions version, trial size, which "how many" questions were marked and which skipped, ticks, average F1, the verdict on each condition of checkpoint 1, sentences that failed or came back unreadable, F1 per category, count error per question. The evidence for comparing two models. |
+| `checkpoint2` | 18, one per "how many" question | Human count, tagger count, how far off, tick or cross, on all 5,152 sentences. Written once, after the full run. It governs what the report says. |
+| `tagging_quality` | One per (category, sentiment) | Both counts, how far apart, precision, recall and F1, on all the data. |
+| `tagging_quality_untouched` | One per (category, sentiment) | The same, on the 3,652 sentences that were never in a trial run: the honest figure for the tagger's general quality. |
 
 ## `sentences_index` — Vector Search 📋 step 4
 
@@ -144,6 +158,8 @@ Pure Python, no Spark, so it can be unit-tested on a laptop in milliseconds. The
 | `config.py` | 59 | Every table name in one place, read from environment with sensible defaults. Stops names being hardcoded in ten files. |
 | `counting.py` | 88 | **The count_sql tool.** Builds the fixed SQL template from a category and sentiment, rejecting anything it does not recognise. The LLM picks values, never writes SQL. |
 | `questions.py` | 183 | The 12 category labels, 7 question templates, id hashing and the dev/test split. Deterministic by design. |
+| `tagging.py` | 161 | The tagger's instructions, one named version per attempt, with the reason for each change. Also finds any dataset sentence that appears inside them. |
+| `scoring.py` | 186 | Measures the tagger against the human labels: F1 per category, count error per question, the checkpoint 1 verdict with its 30-sentence minimum, and the rule that picks the better of two models. |
 | `retrieval.py` | 17 | 📋 Filtered vector search: up to 10 examples for Juno, 20 for the baseline. Stub until step 4. |
 | `baseline.py` | 12 | 📋 Approach A: retrieve 20, answer from them. Stub until step 5. |
 | `agent.py` | 19 | 📋 Approach B: the LangGraph loop. Stub until step 7. |
@@ -158,6 +174,7 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 | `01_ingest.py` | 81 | Streams three JSON files from GitHub into the volume, writes `raw_sentences`, asserts 5,152 records |
 | `02_curate.py` | 136 | Derives `sentences` and `human_labels`, asserts six counts and id uniqueness |
 | `03_eval_set.py` | 243 | Seven SQL aggregates, calls `juno.questions`, attaches an answer to each, writes `eval_questions`, exports JSON |
+| `04_tagging.py` | 442 | Two stages. `trial`: labels the first 1,500 sentences, holds checkpoint 1, saves a row to `tagging_trials`. `full`: refuses to start without a passing trial, labels all 5,152 into `review_facts`, holds checkpoint 2 |
 
 ## `resources/` — jobs as code
 
@@ -165,6 +182,7 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 |---|---|
 | `data.job.yml` | Job `juno-data`: task `ingest`, then `curate` if it succeeded |
 | `evalset.job.yml` | Job `juno-evalset`: builds the question set. **Separate on purpose** — rebuilding data must never silently regenerate the frozen questions |
+| `tagging_trial.job.yml`, `tagging_full.job.yml` | Jobs `juno-tagging-trial` and `juno-tagging-full`, one per file. **Two jobs on purpose** — a passing trial must never start the full run by itself, because two models are compared on the trial first |
 
 ## Configuration and setup
 
@@ -182,8 +200,10 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 |---|---|
 | `tests/test_counting.py` | The SQL template: values travel as parameters, injection attempts rejected, grouping and limits |
 | `tests/test_questions.py` | Determinism, the type mix, split proportions, support thresholds, no neutral, English not category codes |
+| `tests/test_scoring.py` | F1 and count error, checkpoint 1 including the 30-sentence minimum and its edge at 29 and 30, and each of the four steps that pick the better model |
+| `tests/test_tagging.py` | Every kept version of the instructions names all 12 categories; the lost second version says so; a dataset sentence inside the instructions is found |
 
-Run them with `pytest -q` — 18 tests, well under a second, no workspace needed.
+Run them with `pytest -q` — 47 tests, well under a second, no workspace needed.
 
 ## Documentation
 
@@ -194,6 +214,8 @@ Run them with `pytest -q` — 18 tests, well under a second, no workspace needed
 | `docs/data-model.md` | Answering path versus grading path, metric-by-metric truth sources |
 | `docs/setup-walkthrough.md` | How the environment was built and why each piece exists |
 | `docs/design-doc.pdf` | The submitted design document |
+| `docs/design.md` | How the tagger's labels are checked (two checkpoints) and how Juno's score is reported |
+| `docs/implementation.md` | Every remaining step, in order and in detail |
 | `eval/questions.json` | The frozen question set, committed |
 
 ---
@@ -227,7 +249,7 @@ hide.
 | — · Dedicated workspace and storage | ✅ |
 | 1 · Ingest and curate | ✅ 3 tables |
 | 2 · Question set and ground truth | ✅ 98 questions, test split frozen |
-| 3 · Tag every sentence → `review_facts` | Next. First step that costs money |
+| 3 · Tag every sentence → `review_facts` | In progress. Three trial attempts made on 500 sentences; code brought in line with `design.md` on 2026-09-20; nothing run on the full data |
 | 4 · Vector Search index | |
 | 5 · Baseline A | |
 | 6 · Evaluation harness (scorers + judge) | |

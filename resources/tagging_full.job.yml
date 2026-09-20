@@ -1,0 +1,32 @@
+resources:
+  jobs:
+    # The other half of tagging_trial.job.yml. It never starts by itself.
+    tagging_full:
+      name: juno-tagging-full
+      description: >-
+        Label all 5,152 sentences into review_facts, once, then hold checkpoint 2. Refuses to start
+        unless the latest trial for the same model, instructions and trial_size passed checkpoint 1.
+        After this run the tagger is not changed.
+      tags:
+        project: juno
+      queue:
+        enabled: true
+      performance_target: STANDARD
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: model
+          default: ${var.tagging_model}
+        # Must match the trial it rests on; it also defines which sentences count as untouched.
+        - name: trial_size
+          default: "1500"
+        - name: instructions_version
+          default: ""
+      tasks:
+        - task_key: full
+          notebook_task:
+            notebook_path: ../src/notebooks/04_tagging.py
+            base_parameters:
+              stage: full
