@@ -190,7 +190,7 @@ full data. That left 18.
 Ten questions are marked, so the pass mark for condition 1 is 8 ticks of 10.
 
 **Where the number 30 comes from.** It is a judgement number. An earlier AI session set it in
-`src/juno/questions.py` (`MIN_SUPPORT = 30`) to decide which questions to write, and this document
+`eval/question_generator.py` (`MIN_SUPPORT = 30`) to decide which questions to write, and this document
 reuses it to decide which questions to mark. Nobody recorded why it is 30 and not 20 or 40. It was
 checked afterwards, on 2026-09-20, with the same imaginary good tagger and a trial run of 1,500.
 
@@ -255,7 +255,7 @@ is the only stage where the instructions can still be adjusted.
 
 **Where the number 0.60 comes from.** The submitted design lists the tagger's F1 score against the
 human labels as something to measure, with no pass mark. An earlier AI session added the pass mark of
-0.60 on 2026-09-20, in `src/juno/scoring.py` (`MIN_MACRO_F1 = 0.60`), before the first attempt ran. It
+0.60 on 2026-09-20, in `tagger/checkpoints.py` (`MIN_MACRO_F1 = 0.60`), before the first attempt ran. It
 recorded no reason. The number is not derived from Juno's targets or from anything else. It is a
 judgement number. The project owner decided on 2026-09-20 to keep it, averaged over all 12 topics.
 Changing it straight after an attempt that scored 0.59 would look like moving the bar to fit the
@@ -465,7 +465,7 @@ against either candidate.
 
 ## 8. Discipline for the tagger's instructions
 
-- The instructions are kept in code, in `src/juno/tagger_prompt.py`, so that changes can be reviewed.
+- The instructions are kept in code, in `tagger/prompt.py`, so that changes can be reviewed.
 - **No dataset sentences in the instructions.** The examples in them are written by hand. A real
   labelled sentence would leak the truth into the part of the system that answers questions.
 - Adjusting happens on the trial-run sentences only. The full data is labelled once, with the chosen
@@ -543,14 +543,14 @@ deployed to the workspace, and have never been run on Databricks. 47 unit tests 
 | What this document says | State of the code |
 |---|---|
 | The trial run uses 1,500 sentences (4.1). | Done. The job and the notebook default to 1,500. |
-| Questions with fewer than 30 sentences in the trial run are not marked (4.2). | Done, in `src/juno/scoring.py`, with tests including the edge at 29 and 30. |
+| Questions with fewer than 30 sentences in the trial run are not marked (4.2). | Done, in `tagger/checkpoints.py`, with tests including the edge at 29 and 30. |
 | Condition 1 marks the 18 "how many" questions (4.2). | Done. The notebook reads exactly the questions of that kind. |
-| The tagger follows the instructions in `src/juno/tagger_prompt.py` (8). | Done. The notebook's own copy is gone. Every set of labels records the model and the version of the instructions. |
+| The tagger follows the instructions in `tagger/prompt.py` (8). | Done. The notebook's own copy is gone. Every set of labels records the model and the version of the instructions. |
 | Changes to the instructions can be reviewed (8). | Partly. The first and third versions are kept by name, each with the reason for the change. The second was overwritten before this was set up and cannot be recovered; the file says so. |
 | No dataset sentences in the instructions (8). | Done. A tested function finds any dataset sentence inside the instructions. The notebook runs it on all 5,152 sentences before labelling anything and stops if one is found. It ignores sentences shorter than 25 characters, which would match by accident; 25 is a judgement number. |
 | Checkpoint 2 marks all 18 questions once and its result governs the report (5, 6). | Half done. The full run writes the table `checkpoint2`. The report that reads it is built with the evaluation framework. |
 | The full run cannot happen unless checkpoint 1 passed (2). | Done. There are now two jobs, so a passing trial never starts the full run by itself. The full run refuses to start unless the *latest* trial for the same model, instructions and trial size passed. It no longer labels the trial sentences a second time. |
-| Two models are compared under identical conditions (7). | Done. The trial job is run once per model; each run saves a row to `tagging_trials`; the four-step rule that picks the winner is in `src/juno/scoring.py` with a test for each step. Both candidates are accepted by the bulk function in this workspace (checked on 2026-09-20), so code to label one sentence at a time is not needed. |
+| Two models are compared under identical conditions (7). | Done. The trial job is run once per model; each run saves a row to `tagging_trials`; the four-step rule that picks the winner is in `tagger/checkpoints.py` with a test for each step. Both candidates are accepted by the bulk function in this workspace (checked on 2026-09-20), so code to label one sentence at a time is not needed. |
 | The tagger's general quality is reported from the 3,652 untouched sentences (6). | Done. The full run writes `tagging_quality_untouched`. |
 | A sentence that fails must not sink a run. | Done. Failures and unreadable replies are counted and saved with each trial. |
 

@@ -41,7 +41,7 @@ All in `juno.restaurant`.
 |---|---|
 | Grain | One record exactly as downloaded |
 | Rows | 5,152 |
-| Written by | `src/notebooks/01_ingest.py` |
+| Written by | `data_setup/01_ingest.py` |
 | Read by | `02_curate` only |
 
 | Column | Type | Notes |
@@ -60,7 +60,7 @@ Kept unchanged so anything dropped downstream can be recovered without re-downlo
 |---|---|
 | Grain | One row per sentence |
 | Rows | 5,152 |
-| Written by | `src/notebooks/02_curate.py` |
+| Written by | `data_setup/02_curate.py` |
 | Read by | The vector index (step 4), both approaches, every citation lookup |
 
 | Column | Notes |
@@ -79,7 +79,7 @@ and citation built on the old numbering.
 |---|---|
 | Grain | One row per (sentence, category, sentiment) |
 | Rows | 6,547, from 8,496 upstream quadruples |
-| Written by | `src/notebooks/02_curate.py` |
+| Written by | `data_setup/02_curate.py` |
 | Read by | **Evaluation only** — `eval_questions`, scorers, tagger F1 |
 
 | Column | Notes |

@@ -23,7 +23,7 @@ resources:
           default: ${var.tagging_model}
         - name: trial_size
           default: "1500"
-        # Empty means the current version in src/juno/tagger_prompt.py.
+        # Empty means the current version in tagger/prompt.py.
         - name: instructions_version
           default: ""
         # Last tie-break when the two candidates are compared (docs/design.md section 7). Both
@@ -34,6 +34,6 @@ resources:
       tasks:
         - task_key: trial
           notebook_task:
-            notebook_path: ../src/notebooks/04_tagging.py
+            notebook_path: ../tagger/04_tag_sentences.py
             base_parameters:
               stage: trial

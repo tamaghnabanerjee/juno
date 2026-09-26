@@ -9,23 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-# The 12 MEMD-ABSA Restaurant categories, exactly as they appear in the human labels.
-CATEGORIES: tuple[str, ...] = (
-    "Ambience#General",
-    "Drinks#Prices",
-    "Drinks#Quality",
-    "Drinks#Style_Options",
-    "Food#Prices",
-    "Food#Quality",
-    "Food#Style_Options",
-    "Location#General",
-    "Restaurant#General",
-    "Restaurant#Miscellaneous",
-    "Restaurant#Prices",
-    "Service#General",
-)
-
-SENTIMENTS: tuple[str, ...] = ("POS", "NEG", "NEU")
+from juno.categories import CATEGORIES, SENTIMENTS
 
 GROUPABLE: tuple[str, ...] = ("category", "sentiment")
 

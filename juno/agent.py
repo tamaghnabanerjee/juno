@@ -2,7 +2,7 @@
 
 A LangGraph loop where the LLM picks tools rather than following a fixed path:
 
-    question -> agent LLM -> count_sql (juno.counting) and/or find_examples (juno.retrieval)
+    question -> agent LLM -> count_sql (juno.sql_count_tool) and/or find_examples (juno.retrieval)
              -> check every number against the SQL result (one retry) -> answer + cited IDs
 
 Wrapped as an MLflow ResponsesAgent so it can be registered in Unity Catalog and deployed to Model

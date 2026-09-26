@@ -32,6 +32,6 @@ resources:
       tasks:
         - task_key: full
           notebook_task:
-            notebook_path: ../src/notebooks/04_tagging.py
+            notebook_path: ../tagger/04_tag_sentences.py
             base_parameters:
               stage: full

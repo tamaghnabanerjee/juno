@@ -1,6 +1,6 @@
 import pytest
 
-from juno.scoring import (
+from tagger.checkpoints import (
     Checkpoint1,
     Score,
     by_category,

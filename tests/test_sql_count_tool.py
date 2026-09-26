@@ -1,6 +1,6 @@
 import pytest
 
-from juno.counting import build_count_sql
+from juno.sql_count_tool import build_count_sql
 
 TABLE = "juno.restaurant.review_facts"
 

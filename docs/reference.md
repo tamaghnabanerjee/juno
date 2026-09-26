@@ -44,7 +44,7 @@ GitHub JSON
 raw_sentences ──┬─ 02_curate ─▶ sentences ────┬─▶ vector index (step 4) ─▶ examples
   (bronze)      │                (5,152)      │
                 │                             └─▶ ai_query (step 3) ─▶ review_facts ─▶ Juno counts
-                └─ 02_curate ─▶ human_labels ──▶ 03_eval_set ─▶ eval_questions ─▶ grading
+                └─ 02_curate ─▶ human_labels ──▶ 03_build_questions ─▶ eval_questions ─▶ grading
                                  (6,547)                          (98)
 ```
 
@@ -93,7 +93,7 @@ What researchers said each sentence is about. **Used only for grading — Juno n
 | `opinion_terms` | array&lt;string&gt; | The verdict words ("delicious") |
 
 **Rows:** 6,547, from 8,496 upstream quadruples. **Written by:** `02_curate.py`.
-**Read by:** `03_eval_set.py`, and later the scorers and the tagger's F1 measurement.
+**Read by:** `03_build_questions.py`, and later the scorers and the tagger's F1 measurement.
 
 **Grain:** one row per (sentence, category, sentiment). A sentence praising two dishes yields one
 Food#Quality/POS row, not two, because counts are about sentences.
@@ -116,7 +116,7 @@ Food#Quality/POS row, not two, because counts are about sentences.
 | `answer_sentence_ids` | array&lt;string&gt; | The full evidence set for `why` |
 | `support` | int | Sentences behind the answer, for interpreting errors |
 
-**Written by:** `03_eval_set.py`. **Read by:** the evaluation runs in steps 6 and 8.
+**Written by:** `03_build_questions.py`. **Read by:** the evaluation runs in steps 6 and 8.
 Also exported to `eval/questions.json` so a reviewer without workspace access can reproduce it.
 
 ## `review_facts` — gold 📋 step 3
@@ -126,12 +126,12 @@ Also exported to `eval/questions.json` so a reviewer without workspace access ca
 
 Columns: `sentence_id`, `category`, `sentiment`, `model`, `instructions_version`, `tagged_at`. The
 last three record which model and which version of the instructions produced the labels.
-**Written by:** `04_tagging.py` with `stage = full`, once. How the labels are checked before and
+**Written by:** `04_tag_sentences.py` with `stage = full`, once. How the labels are checked before and
 after is set out in [design.md](design.md).
 
 ## Tables that record how far the labels can be trusted 📋 step 3
 
-**None built yet.** All written by `04_tagging.py`.
+**None built yet.** All written by `04_tag_sentences.py`.
 
 | Table | Rows | What it holds |
 |---|---|---|
@@ -149,32 +149,44 @@ Approach A retrieves 20 from it; Juno uses it only to fetch examples for "why" a
 
 # Part 3 — The code
 
-## `src/juno/` — the importable package
+Since 2026-09-26 the code is arranged in one folder per stage of the pipeline, in the order the
+stages run. The folder names are project choices. Notebooks are plain `.py` files with
+`# Databricks notebook source` at the top, so they are readable on GitHub and never store output rows
+of a dataset we cannot redistribute. A notebook imports the Python modules by adding the repo root to
+`sys.path` (the line that computes `repo_root` from the notebook's own path).
 
-Pure Python, no Spark, so it can be unit-tested on a laptop in milliseconds. The notebooks import it.
-
-| File | Lines | What it does |
-|---|---|---|
-| `config.py` | 59 | Every table name in one place, read from environment with sensible defaults. Stops names being hardcoded in ten files. |
-| `counting.py` | 88 | **The count_sql tool.** Builds the fixed SQL template from a category and sentiment, rejecting anything it does not recognise. The LLM picks values, never writes SQL. |
-| `questions.py` | 183 | The 12 category labels, 7 question templates, id hashing and the dev/test split. Deterministic by design. |
-| `tagger_prompt.py` | 223 | The tagger's prompt, one named version per attempt. The reasons for each change are in the project log. Also finds any dataset sentence that appears inside them. |
-| `scoring.py` | 186 | Measures the tagger against the human labels: F1 per category, count error per question, the checkpoint 1 verdict with its 30-sentence minimum, and the rule that picks the better of two models. |
-| `retrieval.py` | 17 | 📋 Filtered vector search: up to 10 examples for Juno, 20 for the baseline. Stub until step 4. |
-| `baseline.py` | 12 | 📋 Approach A: retrieve 20, answer from them. Stub until step 5. |
-| `agent.py` | 19 | 📋 Approach B: the LangGraph loop. Stub until step 7. |
-
-## `src/notebooks/` — what runs on Databricks
-
-Plain `.py` files with `# Databricks notebook source` at the top, so they are readable on GitHub and
-runnable in the workspace, and never store output rows of a dataset we cannot redistribute.
+## `data_setup/` — download and clean the dataset. Done; does not run again.
 
 | File | Lines | What it does |
 |---|---|---|
-| `01_ingest.py` | 81 | Streams three JSON files from GitHub into the volume, writes `raw_sentences`, asserts 5,152 records |
-| `02_curate.py` | 136 | Derives `sentences` and `human_labels`, asserts six counts and id uniqueness |
-| `03_eval_set.py` | 243 | Seven SQL aggregates, calls `juno.questions`, attaches an answer to each, writes `eval_questions`, exports JSON |
-| `04_tagging.py` | 442 | Two stages. `trial`: labels the first 1,500 sentences, holds checkpoint 1, saves a row to `tagging_trials`. `full`: refuses to start without a passing trial unless a written `override_reason` is given, labels the 3,652 sentences outside the trial, reuses the trial's labels for the other 1,500, writes `review_facts`, holds checkpoint 2 |
+| `01_ingest.py` | 81 | Notebook. Streams three JSON files from GitHub into the volume, writes `raw_sentences`, asserts 5,152 records |
+| `02_curate.py` | 136 | Notebook. Derives `sentences` and `human_labels` from `raw_sentences`, asserts six counts and id uniqueness |
+
+## `eval/` — the test set; later the scorers and the judge
+
+| File | Lines | What it does |
+|---|---|---|
+| `03_build_questions.py` | 243 | Notebook. Counts `human_labels` with SQL, gets the questions from `question_generator.py`, attaches the right answer to each, writes `eval_questions`, exports JSON. Done; does not run again. |
+| `question_generator.py` | 183 | The 7 question templates, the plain-English name of each category, question ids and the dev/test split. Needs no data, so it is tested on the laptop. It is the evidence of how the 98 questions were made. |
+| `questions.json` | — | The 98 questions with their right answers. A copy of the table `eval_questions`, kept in git so the frozen test set is visible and any change to it shows. |
+
+## `tagger/` — the LLM labels every sentence. Frozen since 2026-09-25.
+
+| File | Lines | What it does |
+|---|---|---|
+| `04_tag_sentences.py` | 482 | Notebook. Two stages. `trial`: labels the first 1,500 sentences, holds checkpoint 1, saves a row to `tagging_trials`. `full`: refuses to start without a passing trial unless a written `override_reason` is given, labels the 3,652 sentences outside the trial, reuses the trial's labels for the other 1,500, writes `review_facts`, holds checkpoint 2 |
+| `prompt.py` | 130 | The tagger's prompt, version 4, the only version kept. Also the response schema and the check that no dataset sentence appears inside the prompt. |
+| `checkpoints.py` | 206 | Marks the tagger against the human labels: F1 per category, count error per question, the checkpoint 1 verdict with its 30-sentence minimum, the rule that picks the better of two models, and the rule for starting the full run. |
+
+## `juno/` — the product: answers a question
+
+| File | Lines | What it does |
+|---|---|---|
+| `categories.py` | 16 | The 12 categories and 3 sentiments, spelled exactly as in the human labels. Used by the count tool, the tagger's prompt and the tests. |
+| `sql_count_tool.py` | 72 | **The agent's count tool.** Builds a fixed SQL template from a category and sentiment chosen from allow-lists, rejecting anything else. The LLM picks values, never writes SQL. |
+| `retrieval.py` | 17 | 📋 Retrieval: the 20 closest sentences for the RAG baseline, and example sentences filtered by label for the agent. Stub. |
+| `rag_baseline.py` | 12 | 📋 Approach A, the vanilla RAG baseline: retrieve 20, one LLM call. Stub. |
+| `agent.py` | 19 | 📋 Approach B, Juno: the LangGraph agent. Stub. |
 
 ## `resources/` — jobs as code
 
@@ -191,19 +203,19 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 | `databricks.yml` | The bundle: variables (catalog, schema, model endpoints) and targets (`dev`, `prod`) |
 | `infra/setup.sh` | Creates the workspace, storage account, access connector, credential, external location, catalog, schema, volume. Stages: `azure`, `login`, `unity`, `verify` |
 | `sql/00_setup.sql` | The same catalog DDL, for anyone who prefers a SQL editor |
-| `pytest.ini` | Points pytest at `src/` so `import juno` works |
+| `pytest.ini` | `pythonpath = .` points pytest at the repo root, so `import juno`, `import tagger` and `import eval` work |
 | `requirements-dev.txt` | Local tooling only; notebooks install their own dependencies |
 
 ## Tests
 
 | File | Covers |
 |---|---|
-| `tests/test_counting.py` | The SQL template: values travel as parameters, injection attempts rejected, grouping and limits |
-| `tests/test_questions.py` | Determinism, the type mix, split proportions, support thresholds, no neutral, English not category codes |
-| `tests/test_scoring.py` | F1 and count error, checkpoint 1 including the 30-sentence minimum and its edge at 29 and 30, and each of the four steps that pick the better model |
-| `tests/test_tagger_prompt.py` | Every kept version of the instructions names all 12 categories; the lost second version says so; a dataset sentence inside the instructions is found |
+| `tests/test_sql_count_tool.py` | The SQL template: values travel as parameters, injection attempts rejected, grouping and limits |
+| `tests/test_question_generator.py` | Determinism, the type mix, split proportions, support thresholds, no neutral, English not category codes |
+| `tests/test_tagger_checkpoints.py` | F1 and count error, checkpoint 1 including the 30-sentence minimum and its edge at 29 and 30, each of the four steps that pick the better model, and the full-run override |
+| `tests/test_tagger_prompt.py` | The prompt names all 12 categories and ends ready for a sentence; an unknown version raises; a dataset sentence inside the prompt is found |
 
-Run them with `pytest -q` — 47 tests, well under a second, no workspace needed.
+Run them with `pytest -q` — 49 tests, well under a second, no workspace needed.
 
 ## Documentation
 
@@ -226,7 +238,7 @@ Once steps 3–7 are done, asking *"What share of complaints are about service?"
 
 1. The chat app sends the question to both approaches.
 2. **A** searches `sentences_index`, gets 20 sentences, and the LLM answers from those.
-3. **B** decides it is a counting question, calls `count_sql` (from `counting.py`) against
+3. **B** decides it is a counting question, calls `count_sql` (from `juno/sql_count_tool.py`) against
    `review_facts`, gets 471, checks the answer repeats that number, and replies with cited ids.
 4. The evaluation compares both to `eval_questions`: the true answer is 466, so B is within 10% and
    A is not.

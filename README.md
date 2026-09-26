@@ -31,10 +31,11 @@ the failure analysis land here as they are produced.
 |---|---|
 | `infra/` | One-command setup of the workspace, storage and Unity Catalog objects |
 | `databricks.yml`, `resources/` | Databricks Asset Bundle: jobs, and later the index and app |
-| `src/juno/` | Importable core: config, counting, retrieval, baseline, agent |
-| `src/notebooks/` | Notebooks run by the jobs, in Databricks source format |
+| `data_setup/` | Download the dataset and build `raw_sentences`, `sentences`, `human_labels` |
+| `eval/` | Build the frozen test set (`eval_questions`, `questions.json`); later the scorers and the judge |
+| `tagger/` | The LLM labels every sentence into `review_facts`, checked against the human labels |
+| `juno/` | The product: the SQL count tool, retrieval, the RAG baseline and the agent |
 | `sql/` | One-off DDL for the catalog, schema and volume |
-| `eval/` | Question templates and the LLM-judge rubric |
 | `tests/` | Local unit tests that need no workspace |
 | `docs/` | The submitted design document |
 

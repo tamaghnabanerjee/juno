@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 03 — Build the evaluation question set
 # MAGIC
-# MAGIC Renders ~100 questions from templates (`juno.questions`) and computes each correct answer with
+# MAGIC Renders ~100 questions from templates (`eval/question_generator.py`) and computes each correct answer with
 # MAGIC SQL over `human_labels`. No LLM is involved, and no answer comes from Juno's own tags.
 # MAGIC
 # MAGIC The result is `eval_questions`, split 30% `dev` / 70% `test`. **The test split is frozen from
@@ -26,9 +26,9 @@ volume_path = f"/Volumes/{catalog}/{schema}/{volume}"
 # COMMAND ----------
 
 # MAGIC %md ## Import the question templates
-# MAGIC The bundle uploads `src/` next to `src/notebooks/`, so the tested `juno` package is importable
-# MAGIC from the deployed copy. Templates live in code, not in this notebook, so they can be unit
-# MAGIC tested locally without a workspace.
+# MAGIC The bundle uploads the whole repo. This notebook adds the repo root to the import path, so
+# MAGIC `eval/question_generator.py` beside it is importable. Templates live there, not in this notebook,
+# MAGIC so they can be unit tested locally without a workspace.
 
 # COMMAND ----------
 
@@ -38,13 +38,13 @@ import sys
 notebook_path = (
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 )
-src_dir = "/Workspace" + os.path.dirname(os.path.dirname(notebook_path))
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
+repo_root = "/Workspace" + os.path.dirname(os.path.dirname(notebook_path))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-from juno import questions as q  # noqa: E402
+from eval import question_generator as q  # noqa: E402
 
-print(f"templates from {src_dir}: {', '.join(sorted(q.TEMPLATES))}")
+print(f"templates from {repo_root}: {', '.join(sorted(q.TEMPLATES))}")
 
 # COMMAND ----------
 

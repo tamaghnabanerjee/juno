@@ -1,7 +1,7 @@
 """Generate the evaluation question set.
 
 Questions are rendered from templates; their *answers* are computed later by SQL over the human
-labels (see `src/notebooks/03_eval_set.py`). Nothing here invents an answer.
+labels (see `eval/03_build_questions.py`). Nothing here invents an answer.
 
 Everything is deterministic — ids hash the question text, and the dev/test split follows the id — so
 re-running reproduces the identical set. That is what makes "the test split is frozen" an enforceable

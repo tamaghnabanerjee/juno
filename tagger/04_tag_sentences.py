@@ -12,7 +12,7 @@
 # MAGIC 2. the average F1 score over the 12 categories must be at least 0.60.
 # MAGIC
 # MAGIC The result is saved as one row in `tagging_trials`. A failed checkpoint is a result, not a
-# MAGIC crash: adjust the instructions in `src/juno/tagger_prompt.py` and run the trial again.
+# MAGIC crash: adjust the instructions in `tagger/prompt.py` and run the trial again.
 # MAGIC
 # MAGIC **`stage = full`** — label the 3,652 sentences outside the trial, once, reuse the trial's labels
 # MAGIC for the other 1,500, and union them into `review_facts`. It refuses to start unless the latest
@@ -54,15 +54,15 @@ from datetime import datetime, timezone
 notebook_path = (
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
 )
-src_dir = "/Workspace" + os.path.dirname(os.path.dirname(notebook_path))
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
+repo_root = "/Workspace" + os.path.dirname(os.path.dirname(notebook_path))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-from juno import scoring, tagger_prompt  # noqa: E402
-from juno.counting import CATEGORIES, SENTIMENTS  # noqa: E402
+from juno.categories import CATEGORIES, SENTIMENTS  # noqa: E402
+from tagger import checkpoints, prompt  # noqa: E402
 
-version = dbutils.widgets.get("instructions_version").strip() or tagger_prompt.CURRENT_VERSION
-INSTRUCTIONS = tagger_prompt.get(version)
+version = dbutils.widgets.get("instructions_version").strip() or prompt.CURRENT_VERSION
+INSTRUCTIONS = prompt.get(version)
 preferred_order = [m.strip() for m in dbutils.widgets.get("preferred_order").split(",") if m.strip()]
 override_reason = dbutils.widgets.get("override_reason").strip()
 
@@ -82,7 +82,7 @@ print(f"stage={stage} model={model} instructions={version} trial_size={trial_siz
 # COMMAND ----------
 
 corpus = spark.table("sentences").select("sentence_id", "text").collect()
-leaked = set(tagger_prompt.leaked_sentences(INSTRUCTIONS, [r["text"] for r in corpus]))
+leaked = set(prompt.leaked_sentences(INSTRUCTIONS, [r["text"] for r in corpus]))
 leaked_ids = sorted(r["sentence_id"] for r in corpus if r["text"] in leaked)
 assert not leaked_ids, (
     f"{len(leaked_ids)} dataset sentence(s) appear word for word inside instructions {version}: "
@@ -125,7 +125,7 @@ def label(source_table: str, target_table: str) -> dict[str, int]:
     spark.sql(f"""
         CREATE OR REPLACE TABLE {target_table} AS
         WITH parsed AS (
-            SELECT sentence_id, FROM_JSON({reply_text}, '{tagger_prompt.TAGS_SCHEMA}') AS tags
+            SELECT sentence_id, FROM_JSON({reply_text}, '{prompt.TAGS_SCHEMA}') AS tags
             FROM {raw}
         )
         SELECT DISTINCT
@@ -144,7 +144,7 @@ def label(source_table: str, target_table: str) -> dict[str, int]:
         SELECT COUNT(*) AS n,
                COUNT_IF(GET_JSON_OBJECT(reply, '$.errorMessage') IS NOT NULL) AS failed,
                COUNT_IF(GET_JSON_OBJECT(reply, '$.errorMessage') IS NULL
-                        AND FROM_JSON({reply_text}, '{tagger_prompt.TAGS_SCHEMA}') IS NULL) AS unreadable
+                        AND FROM_JSON({reply_text}, '{prompt.TAGS_SCHEMA}') IS NULL) AS unreadable
         FROM {raw}
     """).collect()[0]
     print(f"{stats['n']} sentences sent; {stats['failed']} failed; "
@@ -187,24 +187,24 @@ def measure(tagged: str, restrict_to: str | None = None) -> dict:
     human, llm = counts("human_labels", restrict_to), counts(tagged, restrict_to)
     # A question with no human sentences in this slice has no percentage to be off by.
     errors = {
-        p: scoring.relative_error(llm.get(p, 0), human[p]) for p in pairs if human.get(p, 0) > 0
+        p: checkpoints.relative_error(llm.get(p, 0), human[p]) for p in pairs if human.get(p, 0) > 0
     }
-    scores = scoring.by_category(triples(tagged, restrict_to), triples("human_labels", restrict_to))
+    scores = checkpoints.by_category(triples(tagged, restrict_to), triples("human_labels", restrict_to))
     return {"human": human, "llm": llm, "errors": errors, "scores": scores}
 
 
-def show(m: dict, result: scoring.Checkpoint1 | None = None) -> None:
+def show(m: dict, result: checkpoints.Checkpoint1 | None = None) -> None:
     print(f"{'category':<26}{'P':>6}{'R':>6}{'F1':>6}")
     for category, s in m["scores"].items():
         print(f"{category:<26}{s.precision:>6.2f}{s.recall:>6.2f}{s.f1:>6.2f}")
-    print(f"\n{'average F1':<26}{scoring.macro_f1(m['scores']):>18.2f}\n")
+    print(f"\n{'average F1':<26}{checkpoints.macro_f1(m['scores']):>18.2f}\n")
 
     print(f"{'how many question':<30}{'human':>7}{'tagger':>8}{'off by':>9}  mark")
     for pair, err in sorted(m["errors"].items(), key=lambda kv: -m["human"][kv[0]]):
         if result is not None and pair in result.skipped:
-            mark = f"skipped (fewer than {scoring.MIN_TRIAL_SUPPORT})"
+            mark = f"skipped (fewer than {checkpoints.MIN_TRIAL_SUPPORT})"
         else:
-            mark = "tick" if scoring.within_tolerance(err) else "cross"
+            mark = "tick" if checkpoints.within_tolerance(err) else "cross"
         print(f"{pair[0] + ' ' + pair[1]:<30}{m['human'][pair]:>7}{m['llm'].get(pair, 0):>8}"
               f"{err:>+9.1%}  {mark}")
     if result is not None:
@@ -290,8 +290,8 @@ def as_pairs(names: list[str]) -> tuple[tuple[str, str], ...]:
     return tuple(tuple(name.rsplit(" ", 1)) for name in names)
 
 
-def as_checkpoint1(row) -> scoring.Checkpoint1:
-    return scoring.Checkpoint1(
+def as_checkpoint1(row) -> checkpoints.Checkpoint1:
+    return checkpoints.Checkpoint1(
         ticks=row["ticks"], marked=as_pairs(row["marked"]), skipped=as_pairs(row["skipped"]),
         macro_f1=row["macro_f1"],
     )
@@ -317,7 +317,7 @@ if stage == "trial":
 
     m = measure(labels_table, restrict_to=trial_sentences)
     support = {pair: m["human"].get(pair, 0) for pair in m["errors"]}
-    result = scoring.checkpoint1(m["errors"], support, m["scores"])
+    result = checkpoints.checkpoint1(m["errors"], support, m["scores"])
     print()
     show(m, result)
 
@@ -351,7 +351,7 @@ if stage == "trial":
         print("\nmore than one model tried: give `preferred_order` to pick the winner")
     elif trials:
         try:
-            winner, reason = scoring.pick_winner(trials, preferred_order or list(trials))
+            winner, reason = checkpoints.pick_winner(trials, preferred_order or list(trials))
             print(f"\nahead: {winner} ({reason})")
         except ValueError as e:
             print(f"\ncannot pick a winner yet: {e}")
@@ -373,7 +373,7 @@ if stage == "trial":
 
 mine = [r for r in latest_trials() if r["model"] == model]
 latest = as_checkpoint1(mine[0]) if mine else None
-allowed, why = scoring.full_run_allowed(latest, override_reason)
+allowed, why = checkpoints.full_run_allowed(latest, override_reason)
 assert allowed, (
     f"{why} (model={model}, instructions={version}, trial_size={trial_size}). "
     "Run this notebook with stage = trial first. A failed checkpoint 1 needs a written reason in "
@@ -432,7 +432,7 @@ rows = [
         full["human"].get((q["category"], q["sentiment"]), 0),
         full["llm"].get((q["category"], q["sentiment"]), 0),
         float(full["errors"][(q["category"], q["sentiment"])]),
-        scoring.within_tolerance(full["errors"][(q["category"], q["sentiment"])]),
+        checkpoints.within_tolerance(full["errors"][(q["category"], q["sentiment"])]),
         model, version, bool(latest.passed), override_reason,
     )
     for q in how_many_questions()

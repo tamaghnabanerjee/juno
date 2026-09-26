@@ -1,7 +1,6 @@
 import pytest
 
-from juno.counting import CATEGORIES, SENTIMENTS as ALL_SENTIMENTS
-from juno.questions import (
+from eval.question_generator import (
     CATEGORY_LABELS,
     DEV_FRACTION,
     MIN_SUPPORT,
@@ -10,6 +9,8 @@ from juno.questions import (
     build,
     question_id,
 )
+from juno.categories import CATEGORIES
+from juno.categories import SENTIMENTS as ALL_SENTIMENTS
 
 # The real distribution, measured from juno.restaurant.human_labels.
 SUPPORT = {

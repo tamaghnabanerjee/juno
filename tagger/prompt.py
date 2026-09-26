@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from juno.counting import CATEGORIES
+from juno.categories import CATEGORIES
 
 _CATEGORY_LIST = "\n".join(f"- {c}" for c in CATEGORIES)
 

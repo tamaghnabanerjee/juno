@@ -21,4 +21,4 @@ resources:
       tasks:
         - task_key: eval_set
           notebook_task:
-            notebook_path: ../src/notebooks/03_eval_set.py
+            notebook_path: ../eval/03_build_questions.py
