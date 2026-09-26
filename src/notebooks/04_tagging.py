@@ -12,10 +12,12 @@
 # MAGIC 2. the average F1 score over the 12 categories must be at least 0.60.
 # MAGIC
 # MAGIC The result is saved as one row in `tagging_trials`. A failed checkpoint is a result, not a
-# MAGIC crash: adjust the instructions in `src/juno/tagging.py` and run the trial again.
+# MAGIC crash: adjust the instructions in `src/juno/tagger_prompt.py` and run the trial again.
 # MAGIC
-# MAGIC **`stage = full`** — label all 5,152 sentences, once, into `review_facts`. It refuses to start
-# MAGIC unless the latest trial for the same model and instructions passed. It then holds
+# MAGIC **`stage = full`** — label the 3,652 sentences outside the trial, once, reuse the trial's labels
+# MAGIC for the other 1,500, and union them into `review_facts`. It refuses to start unless the latest
+# MAGIC trial for the same model and instructions passed, or a written `override_reason` is given
+# MAGIC (recorded in `checkpoint2`). It then holds
 # MAGIC **checkpoint 2**: all 18 "how many" questions marked on the full data, saved to `checkpoint2`.
 # MAGIC After this the tagger is not changed.
 # MAGIC
@@ -31,6 +33,9 @@ dbutils.widgets.text("trial_size", "1500")
 dbutils.widgets.dropdown("stage", "trial", ["trial", "full"])
 dbutils.widgets.text("instructions_version", "")
 dbutils.widgets.text("preferred_order", "")
+# Full run only. Empty means "start only after a passing checkpoint 1". A written reason lets the
+# full run start after a failed checkpoint 1; it is recorded in `checkpoint2`.
+dbutils.widgets.text("override_reason", "")
 
 catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")
@@ -53,12 +58,13 @@ src_dir = "/Workspace" + os.path.dirname(os.path.dirname(notebook_path))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from juno import scoring, tagging  # noqa: E402
+from juno import scoring, tagger_prompt  # noqa: E402
 from juno.counting import CATEGORIES, SENTIMENTS  # noqa: E402
 
-version = dbutils.widgets.get("instructions_version").strip() or tagging.CURRENT_VERSION
-INSTRUCTIONS = tagging.get(version)
+version = dbutils.widgets.get("instructions_version").strip() or tagger_prompt.CURRENT_VERSION
+INSTRUCTIONS = tagger_prompt.get(version)
 preferred_order = [m.strip() for m in dbutils.widgets.get("preferred_order").split(",") if m.strip()]
+override_reason = dbutils.widgets.get("override_reason").strip()
 
 # The model name goes into SQL text, so it may only be what an endpoint name can be.
 assert re.fullmatch(r"[A-Za-z0-9._-]+", model), f"not a valid endpoint name: {model!r}"
@@ -76,7 +82,7 @@ print(f"stage={stage} model={model} instructions={version} trial_size={trial_siz
 # COMMAND ----------
 
 corpus = spark.table("sentences").select("sentence_id", "text").collect()
-leaked = set(tagging.leaked_sentences(INSTRUCTIONS, [r["text"] for r in corpus]))
+leaked = set(tagger_prompt.leaked_sentences(INSTRUCTIONS, [r["text"] for r in corpus]))
 leaked_ids = sorted(r["sentence_id"] for r in corpus if r["text"] in leaked)
 assert not leaked_ids, (
     f"{len(leaked_ids)} dataset sentence(s) appear word for word inside instructions {version}: "
@@ -119,7 +125,7 @@ def label(source_table: str, target_table: str) -> dict[str, int]:
     spark.sql(f"""
         CREATE OR REPLACE TABLE {target_table} AS
         WITH parsed AS (
-            SELECT sentence_id, FROM_JSON({reply_text}, '{tagging.TAGS_SCHEMA}') AS tags
+            SELECT sentence_id, FROM_JSON({reply_text}, '{tagger_prompt.TAGS_SCHEMA}') AS tags
             FROM {raw}
         )
         SELECT DISTINCT
@@ -138,7 +144,7 @@ def label(source_table: str, target_table: str) -> dict[str, int]:
         SELECT COUNT(*) AS n,
                COUNT_IF(GET_JSON_OBJECT(reply, '$.errorMessage') IS NOT NULL) AS failed,
                COUNT_IF(GET_JSON_OBJECT(reply, '$.errorMessage') IS NULL
-                        AND FROM_JSON({reply_text}, '{tagging.TAGS_SCHEMA}') IS NULL) AS unreadable
+                        AND FROM_JSON({reply_text}, '{tagger_prompt.TAGS_SCHEMA}') IS NULL) AS unreadable
         FROM {raw}
     """).collect()[0]
     print(f"{stats['n']} sentences sent; {stats['failed']} failed; "
@@ -355,19 +361,53 @@ if stage == "trial":
 
 # MAGIC %md ## Stage `full` — the whole corpus, once
 # MAGIC Refuses to start unless the **latest** trial for this model and these instructions passed
-# MAGIC checkpoint 1. The latest, not any: an earlier lucky pass does not count.
+# MAGIC checkpoint 1. The latest, not any: an earlier lucky pass does not count. After the last
+# MAGIC adjusting round the project owner can start it on a failed checkpoint 1 with a written
+# MAGIC `override_reason`, which is recorded in `checkpoint2`.
+# MAGIC
+# MAGIC The trial sentences already carry this model's labels under these instructions. They are
+# MAGIC reused, so checkpoint 2 sees the very labels checkpoint 1 saw, and only the other sentences
+# MAGIC are labelled now.
 
 # COMMAND ----------
 
 mine = [r for r in latest_trials() if r["model"] == model]
-assert mine and mine[0]["passed"], (
-    f"no passing trial for model={model}, instructions={version}, trial_size={trial_size}. "
-    "Run this notebook with stage = trial first. The full run does not start on a failed checkpoint 1."
+latest = as_checkpoint1(mine[0]) if mine else None
+allowed, why = scoring.full_run_allowed(latest, override_reason)
+assert allowed, (
+    f"{why} (model={model}, instructions={version}, trial_size={trial_size}). "
+    "Run this notebook with stage = trial first. A failed checkpoint 1 needs a written reason in "
+    "`override_reason`."
 )
-print(f"latest trial passed at {mine[0]['run_at']}: average F1 {mine[0]['macro_f1']:.2f}, "
+print(f"latest trial at {mine[0]['run_at']}: average F1 {mine[0]['macro_f1']:.2f}, "
       f"{mine[0]['ticks']} ticks of {len(mine[0]['marked'])}")
+print(why)
 
-stats = label("sentences", "review_facts")
+trial_labels = mine[0]["labels_table"]
+assert spark.catalog.tableExists(trial_labels), f"the trial's labels table {trial_labels} is gone"
+foreign = spark.sql(f"""
+    SELECT COUNT(*) FROM {trial_labels}
+    WHERE model <> '{model}' OR instructions_version <> '{version}'
+""").collect()[0][0]
+assert foreign == 0, f"{trial_labels} holds labels from another model or version"
+
+spark.sql(f"""
+    CREATE OR REPLACE TABLE _full_sentences_rest AS
+    SELECT sentence_id, text FROM sentences
+    WHERE sentence_id NOT IN (SELECT sentence_id FROM sentences ORDER BY sentence_id LIMIT {trial_size})
+""")
+rest_n = spark.table("_full_sentences_rest").count()
+assert rest_n == TOTAL_SENTENCES - trial_size, f"expected {TOTAL_SENTENCES - trial_size}, got {rest_n}"
+print(f"labelling the {rest_n} sentences outside the trial; reusing {trial_labels} for the other {trial_size}")
+
+stats = label("_full_sentences_rest", "_full_labels_rest")
+
+spark.sql(f"""
+    CREATE OR REPLACE TABLE review_facts AS
+    SELECT sentence_id, category, sentiment, model, instructions_version, tagged_at FROM {trial_labels}
+    UNION ALL
+    SELECT sentence_id, category, sentiment, model, instructions_version, tagged_at FROM _full_labels_rest
+""")
 
 total = spark.table("review_facts").count()
 sentences_labelled = spark.table("review_facts").select("sentence_id").distinct().count()
@@ -393,7 +433,7 @@ rows = [
         full["llm"].get((q["category"], q["sentiment"]), 0),
         float(full["errors"][(q["category"], q["sentiment"])]),
         scoring.within_tolerance(full["errors"][(q["category"], q["sentiment"])]),
-        model, version,
+        model, version, bool(latest.passed), override_reason,
     )
     for q in how_many_questions()
 ]
@@ -401,7 +441,7 @@ spark.createDataFrame(
     rows,
     "question_id string, question string, split string, category string, sentiment string, "
     "human_n int, tagger_n int, rel_error double, tick boolean, model string, "
-    "instructions_version string",
+    "instructions_version string, checkpoint1_passed boolean, override_reason string",
 ).write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("checkpoint2")
 
 ticks = sum(r[8] for r in rows)

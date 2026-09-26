@@ -5,6 +5,7 @@ from juno.scoring import (
     Score,
     by_category,
     checkpoint1,
+    full_run_allowed,
     macro_f1,
     pick_winner,
     relative_error,
@@ -179,3 +180,33 @@ def test_winner_with_one_model_says_so():
 def test_winner_refuses_a_model_with_no_place_in_the_preferred_order():
     with pytest.raises(ValueError, match="no preferred order"):
         pick_winner({"stranger": _trial(9, 0.66)}, ORDER)
+
+
+TEN_PAIRS = tuple((f"Topic{i}#General", "POS") for i in range(10))
+PASSED_TRIAL = Checkpoint1(ticks=9, marked=TEN_PAIRS, skipped=(), macro_f1=0.70)
+FAILED_TRIAL = Checkpoint1(ticks=6, marked=TEN_PAIRS, skipped=(), macro_f1=0.62)  # 24 Sep, v4
+
+
+def test_full_run_starts_after_a_pass_with_no_reason_needed():
+    allowed, why = full_run_allowed(PASSED_TRIAL, "")
+    assert allowed
+    assert why == "checkpoint 1 passed"
+
+
+def test_full_run_refuses_a_failed_checkpoint_without_a_written_reason():
+    allowed, why = full_run_allowed(FAILED_TRIAL, "   ")
+    assert not allowed
+    assert "no override reason" in why
+
+
+def test_full_run_starts_after_a_fail_only_with_a_reason_and_keeps_it():
+    allowed, why = full_run_allowed(FAILED_TRIAL, "last adjusting round, decided 2026-09-24")
+    assert allowed
+    assert why.startswith("checkpoint 1 FAILED")
+    assert "decided 2026-09-24" in why
+
+
+def test_full_run_never_starts_without_any_trial_even_with_a_reason():
+    allowed, why = full_run_allowed(None, "any reason at all")
+    assert not allowed
+    assert "no trial run" in why

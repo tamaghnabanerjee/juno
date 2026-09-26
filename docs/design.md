@@ -465,7 +465,7 @@ against either candidate.
 
 ## 8. Discipline for the tagger's instructions
 
-- The instructions are kept in code, in `src/juno/tagging.py`, so that changes can be reviewed.
+- The instructions are kept in code, in `src/juno/tagger_prompt.py`, so that changes can be reviewed.
 - **No dataset sentences in the instructions.** The examples in them are written by hand. A real
   labelled sentence would leak the truth into the part of the system that answers questions.
 - Adjusting happens on the trial-run sentences only. The full data is labelled once, with the chosen
@@ -545,7 +545,7 @@ deployed to the workspace, and have never been run on Databricks. 47 unit tests 
 | The trial run uses 1,500 sentences (4.1). | Done. The job and the notebook default to 1,500. |
 | Questions with fewer than 30 sentences in the trial run are not marked (4.2). | Done, in `src/juno/scoring.py`, with tests including the edge at 29 and 30. |
 | Condition 1 marks the 18 "how many" questions (4.2). | Done. The notebook reads exactly the questions of that kind. |
-| The tagger follows the instructions in `src/juno/tagging.py` (8). | Done. The notebook's own copy is gone. Every set of labels records the model and the version of the instructions. |
+| The tagger follows the instructions in `src/juno/tagger_prompt.py` (8). | Done. The notebook's own copy is gone. Every set of labels records the model and the version of the instructions. |
 | Changes to the instructions can be reviewed (8). | Partly. The first and third versions are kept by name, each with the reason for the change. The second was overwritten before this was set up and cannot be recovered; the file says so. |
 | No dataset sentences in the instructions (8). | Done. A tested function finds any dataset sentence inside the instructions. The notebook runs it on all 5,152 sentences before labelling anything and stops if one is found. It ignores sentences shorter than 25 characters, which would match by accident; 25 is a judgement number. |
 | Checkpoint 2 marks all 18 questions once and its result governs the report (5, 6). | Half done. The full run writes the table `checkpoint2`. The report that reads it is built with the evaluation framework. |

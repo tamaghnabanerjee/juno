@@ -184,3 +184,23 @@ def pick_winner(
     )
     decided = next(i for i in range(4) if first[i] != second[i])
     return winner, steps[decided]
+
+
+def full_run_allowed(latest: Checkpoint1 | None, override_reason: str) -> tuple[bool, str]:
+    """May the full run start on this trial result?
+
+    Normally only after checkpoint 1 passed. After the last adjusting round the project owner can
+    start it on a failed checkpoint 1 by giving a written reason, which is recorded beside the
+    result (design.md section 4.4: stop and choose explicitly). A run with no trial at all is never
+    allowed: the override is for a checked tagger that fell short, not for an unchecked one.
+
+    Returns whether the run may start, and the sentence that says why.
+    """
+    reason = override_reason.strip()
+    if latest is None:
+        return False, "no trial run exists for this model, these instructions and this trial size"
+    if latest.passed:
+        return True, "checkpoint 1 passed"
+    if reason:
+        return True, f"checkpoint 1 FAILED; started on the project owner's written reason: {reason}"
+    return False, "checkpoint 1 failed and no override reason was given"

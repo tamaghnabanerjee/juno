@@ -23,7 +23,7 @@ resources:
           default: ${var.tagging_model}
         - name: trial_size
           default: "1500"
-        # Empty means the current version in src/juno/tagging.py.
+        # Empty means the current version in src/juno/tagger_prompt.py.
         - name: instructions_version
           default: ""
         # Last tie-break when the two candidates are compared (docs/design.md section 7). Both

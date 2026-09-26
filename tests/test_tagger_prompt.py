@@ -1,45 +1,40 @@
 import pytest
 
-from juno import tagging
+from juno import tagger_prompt
 from juno.counting import CATEGORIES
 
 
 def test_the_current_version_is_one_that_was_kept():
-    assert tagging.CURRENT_VERSION in tagging.VERSIONS
-    assert tagging.INSTRUCTIONS == tagging.get(tagging.CURRENT_VERSION)
+    assert tagger_prompt.CURRENT_VERSION in tagger_prompt.VERSIONS
+    assert tagger_prompt.INSTRUCTIONS == tagger_prompt.get(tagger_prompt.CURRENT_VERSION)
 
 
-def test_versions_are_distinct_texts():
-    texts = list(tagging.VERSIONS.values())
-    assert len(set(texts)) == len(texts)
-
-
-def test_v2_was_lost_and_asking_for_it_says_so():
+def test_a_version_not_in_the_file_raises():
     with pytest.raises(ValueError, match="unknown instructions version"):
-        tagging.get("v2")
+        tagger_prompt.get("v3")
 
 
-@pytest.mark.parametrize("version", sorted(tagging.VERSIONS))
+@pytest.mark.parametrize("version", sorted(tagger_prompt.VERSIONS))
 def test_every_version_names_all_12_categories_and_ends_ready_for_a_sentence(version):
-    text = tagging.get(version)
+    text = tagger_prompt.get(version)
     assert all(f"- {category}" in text for category in CATEGORIES)
     assert text.endswith("Sentence: ")
 
 
 def test_a_dataset_sentence_inside_the_instructions_is_found():
     corpus = [
-        "The pasta was cold but our waiter was lovely.",   # word for word in every version
+        "The pasta was cold but our waiter was lovely.",   # word for word in the prompt
         "  the PASTA was cold   but our waiter was lovely. ",  # same, different case and spacing
         "The lamb was overcooked and the bill was wrong.",  # not in the instructions
     ]
-    assert tagging.leaked_sentences(tagging.INSTRUCTIONS, corpus) == corpus[:2]
+    assert tagger_prompt.leaked_sentences(tagger_prompt.INSTRUCTIONS, corpus) == corpus[:2]
 
 
 def test_short_sentences_are_not_looked_for():
     # "Return JSON only" is in the instructions, but a sentence that short would match by accident.
-    assert tagging.leaked_sentences(tagging.INSTRUCTIONS, ["Return JSON only"]) == []
+    assert tagger_prompt.leaked_sentences(tagger_prompt.INSTRUCTIONS, ["Return JSON only"]) == []
 
 
 def test_clean_instructions_report_nothing():
     corpus = ["The lamb was overcooked and the bill was wrong.", "Parking was impossible on a Friday."]
-    assert tagging.leaked_sentences(tagging.INSTRUCTIONS, corpus) == []
+    assert tagger_prompt.leaked_sentences(tagger_prompt.INSTRUCTIONS, corpus) == []

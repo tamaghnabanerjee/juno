@@ -136,7 +136,7 @@ after is set out in [design.md](design.md).
 | Table | Rows | What it holds |
 |---|---|---|
 | `tagging_trials` | One per trial run | Model, instructions version, trial size, which "how many" questions were marked and which skipped, ticks, average F1, the verdict on each condition of checkpoint 1, sentences that failed or came back unreadable, F1 per category, count error per question. The evidence for comparing two models. |
-| `checkpoint2` | 18, one per "how many" question | Human count, tagger count, how far off, tick or cross, on all 5,152 sentences. Written once, after the full run. It governs what the report says. |
+| `checkpoint2` | 18, one per "how many" question | Human count, tagger count, how far off, tick or cross, on all 5,152 sentences; whether checkpoint 1 had passed and, if not, the project owner's written reason for running anyway. Written once, after the full run. It governs what the report says. |
 | `tagging_quality` | One per (category, sentiment) | Both counts, how far apart, precision, recall and F1, on all the data. |
 | `tagging_quality_untouched` | One per (category, sentiment) | The same, on the 3,652 sentences that were never in a trial run: the honest figure for the tagger's general quality. |
 
@@ -158,7 +158,7 @@ Pure Python, no Spark, so it can be unit-tested on a laptop in milliseconds. The
 | `config.py` | 59 | Every table name in one place, read from environment with sensible defaults. Stops names being hardcoded in ten files. |
 | `counting.py` | 88 | **The count_sql tool.** Builds the fixed SQL template from a category and sentiment, rejecting anything it does not recognise. The LLM picks values, never writes SQL. |
 | `questions.py` | 183 | The 12 category labels, 7 question templates, id hashing and the dev/test split. Deterministic by design. |
-| `tagging.py` | 161 | The tagger's instructions, one named version per attempt, with the reason for each change. Also finds any dataset sentence that appears inside them. |
+| `tagger_prompt.py` | 223 | The tagger's prompt, one named version per attempt. The reasons for each change are in the project log. Also finds any dataset sentence that appears inside them. |
 | `scoring.py` | 186 | Measures the tagger against the human labels: F1 per category, count error per question, the checkpoint 1 verdict with its 30-sentence minimum, and the rule that picks the better of two models. |
 | `retrieval.py` | 17 | 📋 Filtered vector search: up to 10 examples for Juno, 20 for the baseline. Stub until step 4. |
 | `baseline.py` | 12 | 📋 Approach A: retrieve 20, answer from them. Stub until step 5. |
@@ -174,7 +174,7 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 | `01_ingest.py` | 81 | Streams three JSON files from GitHub into the volume, writes `raw_sentences`, asserts 5,152 records |
 | `02_curate.py` | 136 | Derives `sentences` and `human_labels`, asserts six counts and id uniqueness |
 | `03_eval_set.py` | 243 | Seven SQL aggregates, calls `juno.questions`, attaches an answer to each, writes `eval_questions`, exports JSON |
-| `04_tagging.py` | 442 | Two stages. `trial`: labels the first 1,500 sentences, holds checkpoint 1, saves a row to `tagging_trials`. `full`: refuses to start without a passing trial, labels all 5,152 into `review_facts`, holds checkpoint 2 |
+| `04_tagging.py` | 442 | Two stages. `trial`: labels the first 1,500 sentences, holds checkpoint 1, saves a row to `tagging_trials`. `full`: refuses to start without a passing trial unless a written `override_reason` is given, labels the 3,652 sentences outside the trial, reuses the trial's labels for the other 1,500, writes `review_facts`, holds checkpoint 2 |
 
 ## `resources/` — jobs as code
 
@@ -201,7 +201,7 @@ runnable in the workspace, and never store output rows of a dataset we cannot re
 | `tests/test_counting.py` | The SQL template: values travel as parameters, injection attempts rejected, grouping and limits |
 | `tests/test_questions.py` | Determinism, the type mix, split proportions, support thresholds, no neutral, English not category codes |
 | `tests/test_scoring.py` | F1 and count error, checkpoint 1 including the 30-sentence minimum and its edge at 29 and 30, and each of the four steps that pick the better model |
-| `tests/test_tagging.py` | Every kept version of the instructions names all 12 categories; the lost second version says so; a dataset sentence inside the instructions is found |
+| `tests/test_tagger_prompt.py` | Every kept version of the instructions names all 12 categories; the lost second version says so; a dataset sentence inside the instructions is found |
 
 Run them with `pytest -q` — 47 tests, well under a second, no workspace needed.
 

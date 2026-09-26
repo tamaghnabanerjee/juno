@@ -59,21 +59,98 @@ other specifics are in Appendix A.
 
 ## Where things stand
 
-| Step | What it builds | State on 2026-09-20 |
+| Step | What it builds | State on 2026-09-25 |
 |---|---|---|
 | 0 | Workspace, storage, catalog, repository, bundle | Done |
 | 1 | The data tables | Done |
 | 2 | The 98 test questions with true answers | Done |
-| 3 | The tagger's labels, checked at two checkpoints | In progress. Three trial attempts made. Steps 3a and 3b done on 2026-09-20, and the workspace was asked which models it accepts for bulk use. Nothing run on the full data. |
-| 4 | The search index over the sentences | Not started |
-| 5 | Approach A, the plain chatbot | Not started. `src/juno/baseline.py` is a placeholder. |
-| 6 | The evaluation framework, version 1, our own | Not started |
-| 7 | Approach B, the Juno agent | Not started. `src/juno/agent.py` is a placeholder. |
-| 8 | The final run on the 70 sealed questions | Not started |
-| 9 | The evaluation framework, version 2, the MLflow route | Not started |
-| 10 | The chat page | Not started |
-| 11 | Access, guardrails and cost controls | A budget alert exists. The rest is not started. |
-| 12 | README, documentation, demo video, public repository | Not started |
+| 3 | The tagger's labels, checked at two checkpoints | Steps 3a to 3g done; 3h (clean up) remains. The preferred candidate with instructions v4 failed checkpoint 1 by two near misses and was run in full on 2026-09-25 under a written override. `review_facts` exists. Checkpoint 2: 6 ticks of 18; on the 13 scored questions, 5 ticks, so the 80% target is out of reach and the report follows `docs/design.md` section 6. The tagger is frozen. |
+| 4 | The search index over the sentences | **Cut from the MVP on 2026-09-25.** Replaced by an embeddings table and one SQL query. See "The MVP scope". |
+| 5 | Approach A, the plain chatbot | Kept, shrunk to one function. Not started. `src/juno/baseline.py` is a placeholder. |
+| 6 | The evaluation framework, version 1, our own | Kept, shrunk: one scorers module, one judge guide, one notebook, 10 hand grades. Not started. |
+| 7 | Approach B, the Juno agent | Kept, minimal graph. Not started. `src/juno/agent.py` is a placeholder. |
+| 8 | The final run on the 70 sealed questions | Kept. Not started. |
+| 9 | The evaluation framework, version 2, the MLflow route | **Cut from the MVP on 2026-09-25.** Enhancement. |
+| 10 | The chat page | **Cut from the MVP on 2026-09-25.** Enhancement. The demo is recorded from a notebook. |
+| 11 | Access, guardrails and cost controls | Shrunk to what exists: the budget alert, the fixed-list counting query, and one line in the agent's instructions that declines off-topic questions. |
+| 12 | README, documentation, demo video, public repository | Kept. Not started. |
+
+## The MVP scope, decided 2026-09-25
+
+On 2026-09-25 the project owner said the project had too many features and asked for a bare-bones
+build: a minimum viable product by the submission on Sunday 2026-09-27, and enhancements after it.
+The scope below was proposed and approved the same day. It is recorded in the project log.
+
+### What the course requires, and what meets it
+
+The course specification is the two-page PDF in the capstone folder. Page 2 lists the requirements.
+Page 3 lists "skipping a simple baseline" as a failure mode, which is why approach A stays.
+
+| Course requirement, from the specification | Met by |
+|---|---|
+| A data surface the system actively queries | Done: `review_facts` and the fixed-template counting query in `src/juno/counting.py`. |
+| A core flow: a retrieval pipeline or an agent loop | Step 7: one LangGraph graph with two tools, a check node and one retry. |
+| A comparison of at least two distinct approaches, with a justified choice. Mandatory. | Steps 5, 6 and 8. |
+| Evaluations that use an LLM judge and quantitative metrics | Step 6. |
+| A README section on failures and pivots; documentation of at most 5 pages; a 3-minute video; repository access | Step 12. |
+| A user interface | Optional in the specification. Cut. |
+
+### Verdict on each remaining step
+
+| Step | Verdict | What changes |
+|---|---|---|
+| 3h | Keep | Unchanged. No cost. |
+| 4 | Cut | No search endpoint and no index. Retrieval is an embeddings table plus one SQL query; see "Retrieval in the MVP" below. This removes the hourly-billed endpoint, the change-feed and filter-column traps, and open decision 3. |
+| 5 | Keep, shrunk | One function: fetch the 20 closest sentences, one model call, return the doorway fields of step 5. |
+| 6 | Keep, shrunk | One scorers module with tests, one judge guide, one notebook that runs both approaches and scores the saved answers. The judge is checked against 10 hand grades, not 30. MLflow is two lines: tracing switched on, and one run that holds the final scores. The submitted design names MLflow 3, so it is not dropped. |
+| 7 | Keep, minimal | The graph as drawn in step 7. No deployment wrapper, because nothing is served. |
+| 8 | Keep | Unchanged. |
+| 9 | Cut | Enhancement. It was never the source of a reported result. |
+| 10 | Cut | Enhancement. The demo video is recorded from a notebook. This overturns the standing decision of 2026-09-15 that the UI is in scope; the project owner made that call on 2026-09-25. |
+| 11 | Shrunk | Only what already exists: the budget alert, the fixed-list counting query, and one line in the agent's instructions that declines questions not about the reviews. The other rows of step 11 are described as future work in the write-up, not built. |
+| 12 | Keep | Unchanged. |
+
+### Retrieval in the MVP
+
+Approach A needs the 20 sentences closest in meaning to the question. Juno needs up to 10 sentences
+that carry a given topic and sentiment, to cite in a "why" answer. Citation accuracy is scored by set
+membership: a cited sentence is right if it carries that label in the human labels. So Juno's
+examples come from a SQL filter over `review_facts` joined to `sentences`, any 10 such sentences.
+Juno's own score never touches search.
+
+Closeness in meaning is done without the platform's search service. An embedding is a list of
+numbers that captures the meaning of a text. The bulk function is run once over the 5,152 sentences
+with the embedding model, and the numbers are stored in a new table, `sentence_embeddings`. That
+table name is a project choice. At answer time the question is embedded the same way. One SQL query
+multiplies the question's numbers against every sentence's numbers, which is the dot product, and
+keeps the 20 highest. Over 5,152 rows that is a small query.
+
+The submitted design says "vector search top 20". This is a vector search on a different service.
+It is recorded in the pivot log as an implementation change, not a change of approach.
+
+Not yet known: whether the bulk function returns a vector for the embedding model in this workspace.
+The platform notes on the laptop say it does. A two-row test settles it, at the cost of two calls.
+If it does not, approach A answers from the question alone with no retrieval, and that is recorded as
+a pivot.
+
+### Open decisions settled by default for the MVP
+
+| # | Question | MVP default |
+|---|---|---|
+| 3 | What one row of the search index is | Moot. There is no index. |
+| 4 | The platform's connector for LangGraph, or direct calls | The connector package. It gives LangGraph tool calling with the least code. A judgement. Appendix A names it. |
+| 5 | Whether "share" questions count towards count accuracy | They are scored with the same within-10% rule and reported in their own rows. The headline stays the 13 scored "how many" questions. |
+| 6 | How a "which is bigger" question is scored | 1 if the right topic is named, else 0. |
+| 7 | What agreement with the hand grades makes the judge trustworthy | Agreement on 10 hand-graded answers is reported. No pass mark. |
+| 8 | Whether to add hand-written questions | No. |
+| 9 | Which toolkit the chat page uses | Moot. There is no chat page. |
+
+### A bug to fix inside the MVP
+
+Found on 2026-09-25: the percent columns of the counting query divide by label rows, not by
+sentences. Worked case: the service, negatively, 480 tagger labels. 480 ÷ 6,866 label rows = 7.0%.
+480 ÷ 5,152 sentences = 9.3%. The test questions define share over sentences, so the query must
+divide by sentences. Fixed on the first laptop action of the plan below.
 
 ## Steps 0 to 2 — done
 
@@ -210,6 +287,13 @@ of one trial size, so they never mix with the real trials.
 
 ### Step 3d — trial runs for both models, checkpoint 1, and the winner
 
+**State: done on 2026-09-24, approved by the project owner.** Both runs were technically clean: for
+each model, 0 of 1,500 sentences failed and 0 replies were unreadable. Both failed checkpoint 1. The
+preferred candidate: 5 ticks of 10, average F1 0.57. The second candidate: 3 ticks of 10, average F1
+0.49. Neither meets both conditions, so the winner rule falls to the higher average F1 score, and the
+preferred candidate is ahead. The project log entry of 2026-09-24 has the count for every marked
+question and the F1 score for every topic. The cost could not be measured; the estimate below stood.
+
 Two actions, both `[runs on Databricks]`. Each is one run of the trial job on the same 1,500
 sentences, with the third version of the instructions. One run uses the preferred candidate. The other
 uses the second candidate. Everything else is identical, so the model is the only thing that differs.
@@ -236,9 +320,17 @@ to that table's third column. Both rows are in `tagging_trials`.
 
 ### Step 3e — if the winner fails checkpoint 1
 
+**State: done on 2026-09-24, approved by the project owner as the last adjusting round.** One new
+version of the instructions, written from label names and the humans' aspect words inside the trial
+sentences, never from sentence text; the reasons are in the project log entry of 2026-09-24. One trial
+run with the preferred candidate: 6 ticks of 10 (needs 8) and average F1 0.62 (needs 0.60), so
+condition 2 passed and condition 1 failed, by 10 sentences on one question and 3 on another. It is
+the better of the two versions by the winner rule. The project log entry of 2026-09-24 has every
+count. The attempt-limit question is thereby settled: this was the last round.
+
 1. `[laptop]` Read the report. The crosses show which questions are off and in which direction. The
    lowest topic scores show which topics the instructions handle badly.
-2. `[laptop]` Write a new version of the instructions in `tagging.py`, with the reason beside it.
+2. `[laptop]` Write a new version of the instructions in `tagger_prompt.py`, with the reason in the project log.
    Examples in the instructions are written by hand, never taken from the dataset.
 3. `[runs on Databricks]` Run the trial job again on the same 1,500 sentences.
 
@@ -247,9 +339,20 @@ question on 2026-09-20. This plan adds nothing to it.
 
 ### Step 3f — the full run and checkpoint 2
 
+**State: done on 2026-09-25, approved by the project owner.** Run under the written override.
+`review_facts`: 6,866 labels over 5,018 sentences; 134 sentences got no label. Checkpoint 2: 6 ticks
+of 18, and 5 of the 13 scored questions. The 8 questions checkpoint 1 could not mark are all crosses.
+The project log entry of 2026-09-25 has every count. The tagger is not changed from here on.
+
 One action, `[runs on Databricks]`: the full-run job, once, with the winning model and the version of
-the instructions that passed. It labels all 5,152 sentences into `review_facts`, then writes
-`checkpoint2` and `tagging_quality`.
+the instructions that did best. It reuses the trial's labels for the 1,500 trial sentences, labels
+the other 3,652, unions them into `review_facts`, then writes `checkpoint2` and `tagging_quality`.
+
+**Added on 2026-09-24.** The full run refuses to start after a failed checkpoint 1 unless the
+project owner gives a written reason in the job parameter `override_reason`. The reason and whether
+checkpoint 1 had passed are written into every row of `checkpoint2`, so the report cannot omit them.
+The code labels only the sentences outside the trial, as `docs/design.md` always said; before
+2026-09-24 it labelled all 5,152 a second time.
 
 **After this action the tagger is not changed.** Not the model and not the instructions. `design.md`
 section 5 explains why: changing it after looking at all the data would fit it to the whole answer
@@ -269,6 +372,10 @@ many" questions and needs 11 of them right. The crosses in `checkpoint2` say, be
 which questions it cannot get right.
 
 ### Step 3g — the tagger's general quality
+
+**State: done on 2026-09-25, by the same run.** On the 3,652 untouched sentences the average F1 is
+0.62, the same as in the trial, so the instructions were not fitted to the trial sentences. 7 of the
+18 counting questions are within 10% there. The rare topics are over-counted by inventing labels.
 
 Produced by the same run as step 3f, through change 11. Both measures, worked out only on the 3,652
 sentences that no adjusting ever touched. It is reported in the README. It is not a pass or fail
@@ -677,36 +784,44 @@ These are not part of this build. They are recorded so that the choice is visibl
 | Enhancement | What it would add | Why it is not in this build | What it would touch |
 |---|---|---|---|
 | Conversation memory, to make Juno a chatbot | Juno would remember the earlier turns of a conversation, so that a follow-up such as "and what about the food?" makes sense. | Decided by the project owner on 2026-09-20. The evaluation needs every question answered on its own, so that a run can be repeated and compared. The plan to 2026-09-27 is also tight. | The chat page (step 10) and the agent's wrapper. LangGraph has a built-in way to save the state of a conversation under a conversation id. The agent that is evaluated, and the 98 test questions, would not change. Follow-up questions would need test questions of their own before any claim was made about them. |
+| The platform's managed search index (plan step 4) | Search that stays in step with the table by itself, and filtered search inside the service. | Cut from the MVP on 2026-09-25. The endpoint bills by the hour and the step carried three traps and an open decision. The MVP ranks embeddings in SQL instead. | `src/juno/retrieval.py`, one new bundle resource for the index, and the endpoint. |
+| The chat page and the serving endpoints (plan step 10) | A page where a person asks both approaches and rates the answers. | Cut from the MVP on 2026-09-25. Optional in the course specification. Overturns the standing decision of 2026-09-15. | The agent's deployment wrapper, two endpoints, the page, and the grants of step 11. |
+| The MLflow evaluation route (plan step 9) | The same scores produced by MLflow's own evaluation function, for learning and as a cross-check. | Cut from the MVP on 2026-09-25. Never the source of a reported result. | A wrapper module over the scorers. |
+| The judge checked against 30 hand grades | Twenty more hand-graded answers. | The MVP checks 10. The submitted design said 30. | `eval/`, and a workspace table of graded answers. |
+| Hand-written questions | A small set of questions written by a person, beside the 98 template questions. | Open decision 8, answered "no" for the MVP on 2026-09-25. | `src/juno/questions.py` and `eval/questions.json`, as a separate labelled set. |
+| The full controls table (plan step 11) | Grants for the page's identity, gateway limits and filtering, a time limit per question. | The MVP keeps only what exists. The rest needs serving endpoints, which are cut. | The gateway settings and the grants. |
+| A Git folder in the workspace | A clone of the repository inside the workspace, for browsing and running cells. | Recommended on 2026-09-25 for after the repository is public. Not decided. | Nothing in the repository. |
+| Subpackages by thing | `src/juno/` regrouped into `core`, `exam`, `tagger`, `agent`, `evals`. | Decided on 2026-09-25 for after submission, in one sitting, with the tests as the safety net. | Every import, `pytest.ini`, and the notebooks' path line. |
 
 ## A day-by-day plan
 
-This is an estimate. It is tight. Steps 9 and 10 are the ones that can give way: the course marks the
-user interface as optional, and step 9 exists for learning.
+Rewritten on 2026-09-25 for the MVP scope. The plan of 2026-09-20 had step 4 finished on Wednesday
+23 September; on Friday 25 September steps 4 to 12 were all unstarted. Two days remain. Each action
+carries one of the three tags from the rules above, and each is approved when it is reached.
 
-| Day | Steps |
-|---|---|
-| Monday 21 September | 3a, 3b, 3c |
-| Tuesday 22 September | 3d, and 3e if needed |
-| Wednesday 23 September | 3f, 3g, 3h, and step 4 |
-| Thursday 24 September | Step 5, and the scoring functions and runner of step 6 |
-| Friday 25 September | The judge and the 30 hand grades of step 6. Step 7 begins. |
-| Saturday 26 September | Step 7 finishes on the development questions. Step 8. Step 10 begins. |
-| Sunday 27 September | Steps 10, 11 and 12. Submission. |
-| After submission, or earlier if time allows | Step 9 |
+| Day | Action | Tag |
+|---|---|---|
+| Saturday 26 September | Commit the step 3f files and this plan. Fix the percent bug in the counting query, with a test. | `[laptop]` |
+| Saturday 26 September | Two-row check that the bulk function returns a vector for the embedding model. Then embed all 5,152 sentences into `sentence_embeddings`. | `[runs on Databricks]` |
+| Saturday 26 September | The retrieval function, the baseline function and the agent graph. Tests use a stand-in model. | `[laptop]` |
+| Saturday 26 September | One notebook answers the 28 development questions with both approaches and saves the answers to a table. Adjust the agent's instructions, at most twice. | `[runs on Databricks]` |
+| Sunday 27 September | The scorers with tests. The judge guide in `eval/judge_guidelines.md`. The same notebook scores the saved development answers. | `[laptop]`, then `[runs on Databricks]` |
+| Sunday 27 September | Step 3h clean-up. The final run: the 70 sealed questions, both approaches, once. Score. Judge. | `[runs on Databricks]` |
+| Sunday 27 September | Hand-grade 10 "why" answers. README results and pivots. Record the video from the notebook. Make the repository public. | `[laptop]` |
 
 ## Decisions still open
 
 | # | Question | Decided at | State |
 |---|---|---|---|
-| 1 | How many attempts at checkpoint 1 are allowed | Step 3e | Parked by the project owner on 2026-09-20 |
+| 1 | How many attempts at checkpoint 1 are allowed | Step 3e | Decided on 2026-09-24: one adjusting round with the winning model, declared the last. If it fails, the full run goes ahead under a written override and the report follows `docs/design.md` section 6. |
 | 2 | Which open model is the second tagger candidate | Step 3b | Decided on 2026-09-20 and named in the project log before its first trial run. Only that one is tried. Appendix A names it. |
-| 3 | What one row of the search index is | Step 4 | Open |
-| 4 | Calling the models through the platform's connector for LangGraph, or directly | Step 5 | Open |
-| 5 | Whether the two kinds of "share" question count towards count accuracy | Step 6 | Open |
-| 6 | How a "which is bigger" question is scored | Step 6 | Open |
-| 7 | What agreement with the 30 hand grades makes the judge trustworthy | Step 6 | Open |
-| 8 | Whether to add a small set of questions written by hand | Step 6 | Open |
-| 9 | Which toolkit the chat page uses | Step 10 | Open |
+| 3 | What one row of the search index is | Step 4 | Moot since 2026-09-25: the index is cut from the MVP. |
+| 4 | Calling the models through the platform's connector for LangGraph, or directly | Step 5 | MVP default of 2026-09-25: the connector. |
+| 5 | Whether the two kinds of "share" question count towards count accuracy | Step 6 | MVP default of 2026-09-25: same rule, own rows, not the headline. |
+| 6 | How a "which is bigger" question is scored | Step 6 | MVP default of 2026-09-25: 1 if the right topic is named. |
+| 7 | What agreement with the 30 hand grades makes the judge trustworthy | Step 6 | MVP default of 2026-09-25: 10 hand grades, agreement reported, no pass mark. |
+| 8 | Whether to add a small set of questions written by hand | Step 6 | MVP default of 2026-09-25: no. |
+| 9 | Which toolkit the chat page uses | Step 10 | Moot since 2026-09-25: the chat page is cut from the MVP. |
 | 10 | How decisions are attributed in documents that will be public | Step 12 | Open |
 
 ## What costs money
@@ -716,7 +831,7 @@ user interface as optional, and step 9 exists for learning.
 | Asking the workspace which models it accepts for bulk use | 3b, done | 18 calls of a few words, and a few minutes of the SQL warehouse |
 | Five-sentence test of both candidates | 3c | Ten model calls with the full instructions |
 | Trial runs of 1,500 sentences | 3d, 3e | Estimated from published prices, per run: about $7.50 with the preferred candidate and about $0.70 with the second. Working: the instructions are 3,270 characters, about 818 tokens; with the sentence that is about 845 tokens in and 30 out for each sentence, so 1.27 million in and 0.045 million out for 1,500. Appendix A has the prices. Not measured: the billing table could not be read. |
-| The full run of 5,152 sentences | 3f | About 3.4 times one trial run, because 5,152 ÷ 1,500 = 3.4: about $25.60 with the preferred candidate, about $2.40 with the second |
+| The full run | 3f | Only the 3,652 sentences outside the trial are labelled (the trial's labels are reused). With the preferred candidate and instructions v4 (about 1,250 tokens in per sentence): 3,652 × 1,250 = 4.6 million tokens in, about $23; plus about $3 out: about $25.50 |
 | The search endpoint | From step 4 until the demo is recorded | Billed by the hour for as long as it exists. The rate has not been looked up. |
 | Answering the test questions | Steps 6, 7, 8 | 98 questions, two approaches, a few model calls each |
 | The judge | Steps 6, 8, 9 | One call per "why" answer. There are 20 "why" questions. |
