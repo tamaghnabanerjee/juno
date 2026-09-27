@@ -149,7 +149,7 @@ def test_winner_step_1_passing_beats_failing_even_with_a_lower_f1():
 
 
 def test_winner_step_2_higher_f1_beats_more_ticks():
-    # The made-up case in design.md section 7: X has 9 ticks and 0.61, Y has 8 ticks and 0.70.
+    # A made-up case: X has 9 ticks and 0.61, Y has 8 ticks and 0.70.
     results = {"preferred": _trial(9, 0.61), "open": _trial(8, 0.70)}
     winner, reason = pick_winner(results, ORDER)
     assert winner == "open" and reason.startswith("step 2")

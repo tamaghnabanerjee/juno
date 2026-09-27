@@ -2,8 +2,8 @@
 
 Tamaghna Banerjee · Azure Databricks · 27 September 2026
 
-This describes the system as built and evaluated. The design submitted on 17 September 2026 is kept
-unchanged as [design-doc.pdf](design-doc.pdf); section 7 lists what changed and why.
+This describes the system as built and evaluated. Section 7 lists what changed from the design
+submitted on 17 September 2026, and why.
 
 ## 1. Problem
 

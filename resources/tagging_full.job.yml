@@ -26,7 +26,7 @@ resources:
           default: ""
         # Empty: start only after a passing checkpoint 1. After the last adjusting round the
         # project owner may give a written reason here to start on a failed checkpoint 1; it is
-        # recorded in checkpoint2 (docs/design.md section 4.4).
+        # recorded in checkpoint2.
         - name: override_reason
           default: ""
       tasks:

@@ -1,8 +1,7 @@
 resources:
   jobs:
     # Two jobs on purpose: this one and tagging_full.job.yml. A passing trial must never start the full run by itself: two models are
-    # compared on the trial first, and a winner is picked, before anything is labelled in full
-    # (docs/design.md section 7).
+    # compared on the trial first, and a winner is picked, before anything is labelled in full.
     tagging_trial:
       name: juno-tagging-trial
       description: >-
@@ -26,7 +25,7 @@ resources:
         # Empty means the current version in tagger/prompt.py.
         - name: instructions_version
           default: ""
-        # Last tie-break when the two candidates are compared (docs/design.md section 7). Both
+        # Last tie-break when the two candidates are compared. Both
         # names were checked against this workspace on 2026-09-20: both exist and both are accepted
         # by the bulk function.
         - name: preferred_order

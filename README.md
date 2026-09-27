@@ -201,9 +201,6 @@ the judge against human grades; a second evaluation route through MLflow's evalu
 |---|---|
 | [docs/walkthrough_video.mov](docs/walkthrough_video.mov) | The 3-minute demo video |
 | [docs/system-design.md](docs/system-design.md) | The system design as built, with what changed from the submitted design |
-| [docs/design-doc.pdf](docs/design-doc.pdf) | The design submitted on 17 September 2026, kept unchanged |
-| [docs/design.md](docs/design.md) | The design record for checking the LLM's labels (checkpoints 1 and 2) |
-| [docs/setup-walkthrough.md](docs/setup-walkthrough.md) | How the Azure and Databricks environment was built |
 | [infra/README.md](infra/README.md) | The setup script: what it creates, cost, teardown |
 
 ## Licence

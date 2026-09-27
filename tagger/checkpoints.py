@@ -8,7 +8,7 @@ Two things matter, and they are not the same:
   on mediocre rows.
 
 Pure functions over sets of `(sentence_id, category, sentiment)` triples, so they run in tests
-without Spark. The rules they implement are set out in `docs/design.md`, sections 4 and 7.
+without Spark.
 """
 
 from __future__ import annotations
@@ -24,12 +24,12 @@ Pair = tuple[str, str]
 COUNT_TOLERANCE = 0.10
 MIN_PAIRS_WITHIN_TOLERANCE = 0.80
 
-# A judgement number with no recorded reason (design.md section 4.3). Kept on 2026-09-20.
+# A judgement number with no recorded reason. Kept on 2026-09-20.
 MIN_MACRO_F1 = 0.60
 
 # A question is only marked in a trial run if the humans found at least this many of its sentences
 # there. Below it, one or two borderline sentences decide the mark. A judgement number, checked by
-# simulation (design.md section 4.2 and Appendix B).
+# simulation.
 MIN_TRIAL_SUPPORT = 30
 
 
@@ -151,7 +151,7 @@ def pick_winner(
 ) -> tuple[str, str]:
     """Pick the better tagger model from trial runs made under identical conditions.
 
-    The order was fixed before any result existed (design.md section 7):
+    The order was fixed before any result existed:
 
     1. a model that meets both conditions beats one that does not;
     2. then the higher average F1, compared to two decimal places;
@@ -191,7 +191,7 @@ def full_run_allowed(latest: Checkpoint1 | None, override_reason: str) -> tuple[
 
     Normally only after checkpoint 1 passed. After the last adjusting round the project owner can
     start it on a failed checkpoint 1 by giving a written reason, which is recorded beside the
-    result (design.md section 4.4: stop and choose explicitly). A run with no trial at all is never
+    result. A run with no trial at all is never
     allowed: the override is for a checked tagger that fell short, not for an unchecked one.
 
     Returns whether the run may start, and the sentence that says why.

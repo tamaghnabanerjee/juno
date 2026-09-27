@@ -3,7 +3,7 @@
 # MAGIC # 04 — Label every sentence, and prove how far the labels can be trusted
 # MAGIC
 # MAGIC Juno counts rows in `review_facts`. If the labels are wrong, Juno is wrong — however good the
-# MAGIC agent is. `docs/design.md` sets the rules this notebook follows. It runs in one of two stages.
+# MAGIC agent is. The checkpoint rules are in `tagger/checkpoints.py`. It runs in one of two stages.
 # MAGIC
 # MAGIC **`stage = trial`** — label the first `trial_size` sentences and hold **checkpoint 1**:
 # MAGIC
@@ -336,9 +336,8 @@ if stage == "trial":
 # COMMAND ----------
 
 # MAGIC %md ## Where the models stand
-# MAGIC Trials made with identical instructions on the same sentences, compared in the order fixed in
-# MAGIC `docs/design.md` section 7: meets both conditions, then average F1, then ticks, then the
-# MAGIC preferred order.
+# MAGIC Trials made with identical instructions on the same sentences, compared in a fixed order:
+# MAGIC meets both conditions, then average F1, then ticks, then the preferred order.
 
 # COMMAND ----------
 
@@ -418,8 +417,8 @@ print(f"sentences with no label: {TOTAL_SENTENCES - sentences_labelled} "
 # COMMAND ----------
 
 # MAGIC %md ## Checkpoint 2 — all 18 "how many" questions, on all the data
-# MAGIC Marked once. Nothing stops on a cross: the table governs what the report says
-# MAGIC (`docs/design.md` section 6). **After this the tagger is not changed.**
+# MAGIC Marked once. Nothing stops on a cross: the table governs what the report says.
+# MAGIC **After this the tagger is not changed.**
 
 # COMMAND ----------
 
