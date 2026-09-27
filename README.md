@@ -24,6 +24,65 @@ Unity Catalog. Stage 3 decides accuracy: Juno counts `review_facts`, the LLM's l
 The highlighted edge is the whole difference: only Juno can call `count_sentences`, which counts
 labels over the full corpus. Both approaches use the same model and the same scoring.
 
+## Tech stack
+
+| Layer | Technology | Used for |
+|---|---|---|
+| Platform | Azure Databricks, serverless jobs | Every notebook runs as a job; no clusters to manage |
+| Deployment | Databricks CLI, Databricks Asset Bundles | Jobs defined as code in `databricks.yml` and `resources/` |
+| Data | Unity Catalog, Delta tables, a volume | All tables in `juno.restaurant`; raw files in the volume |
+| Bulk LLM work | `ai_query` in SQL | Labelling every review sentence; making the embeddings |
+| Models | Databricks pay-per-token endpoints | Tagger: Claude Opus 4.8 · both approaches: Llama 3.3 70B Instruct · judge: Qwen 3.5 122B · embeddings: GTE Large (English) |
+| Vector search | Cosine similarity in SQL | Over the `sentence_embeddings` table (the managed Vector Search service was deferred) |
+| Agent | LangGraph 1.2.12, databricks-langchain | The ReAct loop and the connection to the model |
+| Direct model calls | databricks-sdk | The baseline's LLM call and the judge |
+| Evaluation | Own scorers and LLM judge | Results kept in `eval_answers` and `eval_scores` |
+| Code quality | Python 3.12, pytest, ruff, GitHub | 105 unit tests that need no workspace |
+
+The answering model was planned as Claude Sonnet 5 and the judge as Claude Opus 5. In this workspace
+every Claude model returns "Databricks-set rate limit of 0" for real-time calls, while all eight open
+chat models answered and called tools correctly (checked 2026-09-27).
+
+## The data and its tables
+
+The data is the public [MEMD-ABSA](https://github.com/NUSTM/MEMD-ABSA) Restaurant dataset (Cai et
+al., 2023): 5,152 English sentences from restaurant reviews. People labelled each sentence with one or
+more of 12 categories, such as `Service#General` or `Food#Quality`, each with a sentiment: positive,
+negative or neutral. Those human labels are the right answers. A sentence can carry several labels, so
+there are more labels than sentences. The dataset is downloaded at run time and never committed (it
+has no licence file). Every table lives in Unity Catalog, in the schema `juno.restaurant`.
+
+| Table | One row is | Rows |
+|---|---|---|
+| `sentences` | one review sentence: its id and its text | 5,152 |
+| `human_labels` | one category and sentiment a person gave a sentence: the right answers | 6,547 |
+| `eval_questions` | one test question, with its right answer computed from `human_labels` | 98 (28 dev, 70 test) |
+| `review_facts` | one category and sentiment the LLM gave a sentence: what Juno counts | 6,866 |
+| `checkpoint2` | one "how many" question: the human count, the LLM count, and whether they are within 10% | 18 |
+| `sentence_embeddings` | one sentence's embedding, 1,024 numbers, used for search | 5,152 |
+| `eval_answers` | one answer from either approach | 224 |
+| `eval_scores` | one score for one answer on one measure, with the judge's grade for "why" answers | 288 |
+
+Two more tables are records of the build: `raw_sentences` (the download as it came) and
+`tagging_trials` (one row per labelling trial).
+
+## The pipeline, stage by stage
+
+Each stage is one job; the tables it writes are described above.
+
+| Stage | Code | Runs as | Writes |
+|---|---|---|---|
+| 1. Download and clean | `data_setup/01_ingest.py`, `02_curate.py` | job `juno-data` | `raw_sentences`, `sentences`, `human_labels` |
+| 2. Frozen test questions | `eval/03_build_questions.py`, `question_generator.py` | job `juno-evalset` | `eval_questions` |
+| 3. LLM labels every sentence | `tagger/04_tag_sentences.py`, `prompt.py`, `checkpoints.py` | jobs `juno-tagging-trial`, `juno-tagging-full` | `review_facts`, `checkpoint2`, `tagging_trials` |
+| 4. Embeddings | `sql/01_sentence_embeddings.sql` | one SQL statement, run once | `sentence_embeddings` |
+| Answering, A or B | `eval/05_answer_questions.py` with `juno/rag_baseline.py` or `juno/agent.py` | job `juno-answers` | `eval_answers` |
+| Scoring and judge | `eval/06_score_answers.py`, `scorers.py`, `judge.py` | job `juno-scores` | `eval_scores` |
+
+The product code is in `juno/` (`categories.py`, `sql_count_tool.py`, `retrieval.py`,
+`rag_baseline.py`, `agent.py`). The jobs are defined in `databricks.yml` and `resources/`; workspace
+setup is in `infra/` and `sql/`; unit tests are in `tests/`.
+
 ## The two approaches
 
 | | A. Retrieval only (RAG baseline) | B. Juno: RAG + agent over the full corpus |
@@ -36,44 +95,6 @@ labels over the full corpus. Both approaches use the same model and the same sco
 Both return the same fields (answer text, number, unit, ranked categories, cited sentence ids), so
 the same scorers apply to both. The LLM never writes SQL: categories and sentiments are chosen from
 fixed allow-lists (`juno/categories.py`) and passed as query parameters.
-
-## The pipeline, stage by stage
-
-Data: [MEMD-ABSA](https://github.com/NUSTM/MEMD-ABSA) Restaurant (Cai et al., 2023), 5,152 English
-review sentences with human labels over 12 categories; downloaded at run time, never committed (the
-dataset has no licence file). All tables live in Unity Catalog, schema `juno.restaurant`.
-
-| Stage | Code | Runs as | Writes (rows) |
-|---|---|---|---|
-| 1. Download and clean | `data_setup/01_ingest.py`, `02_curate.py` | job `juno-data` | `raw_sentences`, `sentences` (5,152), `human_labels` (6,547) |
-| 2. Frozen test questions | `eval/03_build_questions.py`, `question_generator.py` | job `juno-evalset` | `eval_questions` (98: 28 dev, 70 test) |
-| 3. LLM labels every sentence | `tagger/04_tag_sentences.py`, `prompt.py`, `checkpoints.py` | jobs `juno-tagging-trial`, `juno-tagging-full` | `review_facts` (6,866), `checkpoint2` (18), `tagging_trials` |
-| 4. Embeddings | `sql/01_sentence_embeddings.sql` | one SQL statement, run once | `sentence_embeddings` (5,152 × 1,024 numbers) |
-| Answering, A or B | `eval/05_answer_questions.py` with `juno/rag_baseline.py` or `juno/agent.py` | job `juno-answers` | `eval_answers` |
-| Scoring and judge | `eval/06_score_answers.py`, `scorers.py`, `judge.py` | job `juno-scores` | `eval_scores` |
-
-The product code is in `juno/` (`categories.py`, `sql_count_tool.py`, `retrieval.py`,
-`rag_baseline.py`, `agent.py`). The jobs are defined in `databricks.yml` and `resources/`; workspace
-setup is in `infra/` and `sql/`; unit tests are in `tests/`.
-
-## Tech stack
-
-| Layer | Technology | Used for |
-|---|---|---|
-| Platform | Azure Databricks, serverless jobs | Every notebook runs as a job; no clusters to manage |
-| Deployment | Databricks CLI, Databricks Asset Bundles | Jobs defined as code in `databricks.yml` and `resources/` |
-| Data | Unity Catalog, Delta tables, a volume | All tables in `juno.restaurant`; raw files in the volume |
-| Bulk LLM work | `ai_query` in SQL | Labelling the 5,152 sentences; making the embeddings |
-| Models | Databricks pay-per-token endpoints | Tagger: Claude Opus 4.8 · both approaches: Llama 3.3 70B Instruct · judge: Qwen 3.5 122B · embeddings: GTE Large (English) |
-| Vector search | Cosine similarity in SQL | Over the `sentence_embeddings` table (the managed Vector Search service was deferred) |
-| Agent | LangGraph 1.2.12, databricks-langchain | The ReAct loop and the connection to the model |
-| Direct model calls | databricks-sdk | The baseline's LLM call and the judge |
-| Evaluation | Own scorers and LLM judge | Results kept in `eval_answers` and `eval_scores` |
-| Code quality | Python 3.12, pytest, ruff, GitHub | 105 unit tests that need no workspace |
-
-The answering model was planned as Claude Sonnet 5 and the judge as Claude Opus 5. In this workspace
-every Claude model returns "Databricks-set rate limit of 0" for real-time calls, while all eight open
-chat models answered and called tools correctly (checked 2026-09-27).
 
 ## Results on the 70 test questions
 
@@ -131,24 +152,6 @@ counts on rare categories are rough.
   from the answering model.
 - **Runs:** `eval/05_answer_questions.py` (job `juno-answers`) writes answers to `eval_answers`;
   `eval/06_score_answers.py` (job `juno-scores`) writes scores to `eval_scores`.
-
-## How it was built
-
-1. A dedicated Azure Databricks workspace and storage, set up by one script; every job defined as code.
-2. The dataset downloaded and split into sentences and human labels (5,152 sentences, ids unique).
-3. 98 test questions generated from templates, right answers by SQL over the human labels, frozen
-   as 28 dev and 70 test.
-4. An LLM labelled every sentence. Trials compared models on the same 1,500 sentences; Claude Opus 4.8
-   won. Its last prompt version reached average F1 0.62 but 6 of 10 counts within 10% (target 8).
-5. Full labelling run; checkpoint 2 showed only 5 of the 13 test count questions within 10% of the
-   human count, the ceiling for Juno's counts, known before Juno was built.
-6. Scope cut to the minimum the course requires; repository reorganised into one folder per stage.
-7. Count tool fixed to count sentences; embeddings made in SQL; retrieval as cosine similarity in SQL.
-8. The planned Claude models were rate-limited to zero here; both approaches moved to Llama 3.3 70B,
-   the judge to Qwen 3.5 122B.
-9. RAG baseline, Juno agent, scorers and judge built, unit-tested, and run on the 28 dev questions;
-   one prompt line fixed comparison answers.
-10. Final run: 70 test questions through each approach once, then scoring. Repository made public.
 
 ## Failures and pivots
 
