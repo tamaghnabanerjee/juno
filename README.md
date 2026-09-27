@@ -31,7 +31,7 @@ labels over the full corpus. Both approaches use the same model and the same sco
 | Code | `juno/rag_baseline.py` | `juno/agent.py` |
 | How it answers | Vector search returns the 20 sentences closest to the question; one LLM call answers from them | A LangGraph ReAct agent: the LLM calls `count_sentences` (a fixed SQL template over the labels) and/or `find_examples` (vector search restricted to one category and sentiment, top 10) |
 | Checks | none | The stated number must be one the count tool returned; otherwise one retry |
-| Answering model | the same model for both (see [Models and platform](#models-and-platform)) | the same |
+| Answering model | the same model for both (see [Tech stack](#tech-stack)) | the same |
 
 Both return the same fields (answer text, number, unit, ranked categories, cited sentence ids), so
 the same scorers apply to both. The LLM never writes SQL: categories and sentiments are chosen from
@@ -55,6 +55,25 @@ dataset has no licence file). All tables live in Unity Catalog, schema `juno.res
 The product code is in `juno/` (`categories.py`, `sql_count_tool.py`, `retrieval.py`,
 `rag_baseline.py`, `agent.py`). The jobs are defined in `databricks.yml` and `resources/`; workspace
 setup is in `infra/` and `sql/`; unit tests are in `tests/`.
+
+## Tech stack
+
+| Layer | Technology | Used for |
+|---|---|---|
+| Platform | Azure Databricks, serverless jobs | Every notebook runs as a job; no clusters to manage |
+| Deployment | Databricks CLI, Databricks Asset Bundles | Jobs defined as code in `databricks.yml` and `resources/` |
+| Data | Unity Catalog, Delta tables, a volume | All tables in `juno.restaurant`; raw files in the volume |
+| Bulk LLM work | `ai_query` in SQL | Labelling the 5,152 sentences; making the embeddings |
+| Models | Databricks pay-per-token endpoints | Tagger: Claude Opus 4.8 · both approaches: Llama 3.3 70B Instruct · judge: Qwen 3.5 122B · embeddings: GTE Large (English) |
+| Vector search | Cosine similarity in SQL | Over the `sentence_embeddings` table (the managed Vector Search service was deferred) |
+| Agent | LangGraph 1.2.12, databricks-langchain | The ReAct loop and the connection to the model |
+| Direct model calls | databricks-sdk | The baseline's LLM call and the judge |
+| Evaluation | Own scorers and LLM judge | Results kept in `eval_answers` and `eval_scores` |
+| Code quality | Python 3.12, pytest, ruff, GitHub | 105 unit tests that need no workspace |
+
+The answering model was planned as Claude Sonnet 5 and the judge as Claude Opus 5. In this workspace
+every Claude model returns "Databricks-set rate limit of 0" for real-time calls, while all eight open
+chat models answered and called tools correctly (checked 2026-09-27).
 
 ## Results on the 70 test questions
 
@@ -165,21 +184,6 @@ databricks bundle run scores  -t dev --profile <profile> --params split=dev
 
 `approach` is `rag_baseline` or `juno_agent`; `split` is `dev` or `test`. Setup of the workspace and
 catalog: [infra/README.md](infra/README.md). Unit tests: `.venv/bin/pytest -q`.
-
-## Models and platform
-
-Azure Databricks (Unity Catalog, Model Serving pay-per-token endpoints, serverless jobs).
-
-| Role | Model |
-|---|---|
-| Tagger (bulk, 24–25 Sep) | Claude Opus 4.8 |
-| Answering model, both approaches | Llama 3.3 70B Instruct |
-| Judge | Qwen 3.5 122B |
-| Embeddings | GTE Large (English) |
-
-Planned: Claude Sonnet 5 answering and Claude Opus 5 judging. In this workspace every Claude model
-returns "Databricks-set rate limit of 0" for real-time calls; all eight open chat models answered and
-called tools correctly (checked 2026-09-27).
 
 ## Enhancements for later
 
