@@ -1,0 +1,20 @@
+resources:
+  jobs:
+    answers:
+      name: juno-answers
+      tags:
+        project: juno
+      queue:
+        enabled: true
+      performance_target: STANDARD
+      parameters:
+        - name: approach
+          default: rag_baseline
+        - name: split
+          default: dev
+        - name: limit
+          default: "1"
+      tasks:
+        - task_key: answer
+          notebook_task:
+            notebook_path: ../eval/05_answer_questions.py

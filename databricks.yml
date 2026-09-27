@@ -36,7 +36,7 @@ variables:
     default: databricks-meta-llama-3-3-70b-instruct
   agent_model:
     description: Chat endpoint used by approach A and the Juno agent.
-    default: databricks-claude-sonnet-5
+    default: databricks-meta-llama-3-3-70b-instruct
   judge_model:
     description: Chat endpoint used by the LLM judge; deliberately a different model from the agent.
     default: databricks-claude-opus-5

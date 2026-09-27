@@ -23,16 +23,20 @@ def _check(value: str, allowed: tuple[str, ...], what: str) -> str:
 def build_count_sql(
     table: str,
     *,
+    sentences_table: str,
     category: str | None = None,
     sentiment: str | None = None,
     group_by: str | None = None,
     top_n: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    """Return (sql, parameters) for a count over every labelled row.
+    """Return (sql, parameters) for a count of sentences.
 
-    Counts come back with the share of the filtered total, because most questions ask "what share".
-    With `group_by` the result is one row per category or sentiment, ordered by count, which is what
-    a "top themes" question needs.
+    Every count is of distinct sentences, the unit the test set counts. `table` and
+    `sentences_table` come from the calling code, never from the LLM.
+
+    Without `group_by`: the count, its share of all sentences, and, when a sentiment is given, its
+    share of the sentences carrying that sentiment. With `group_by`: one row per category or
+    sentiment, largest first, ties broken by name, for "top topics" questions.
     """
     if group_by is not None:
         _check(group_by, GROUPABLE, "group_by")
@@ -49,23 +53,29 @@ def build_count_sql(
         filters.append("sentiment = :sentiment")
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
 
-    # `table` is never LLM-supplied; it comes from config.
+    n = "COUNT(DISTINCT sentence_id)"
     if group_by is None:
-        sql = (
-            "SELECT COUNT(*) AS n,\n"
-            "       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM {t}), 1) AS pct_of_all\n"
-            "FROM {t}\n"
-            "{where}"
-        ).format(t=table, where=where)
+        columns = [
+            f"{n} AS n",
+            (
+                f"ROUND(100.0 * {n} / NULLIF((SELECT COUNT(*) FROM {sentences_table}), 0), 1)"
+                " AS pct_of_all_sentences"
+            ),
+        ]
+        if sentiment is not None:
+            columns.append(
+                f"ROUND(100.0 * {n} / NULLIF((SELECT {n} FROM {table}"
+                " WHERE sentiment = :sentiment), 0), 1) AS pct_within_sentiment"
+            )
+        sql = "SELECT " + ",\n       ".join(columns) + f"\nFROM {table}\n{where}"
     else:
         sql = (
-            "SELECT {g} AS group_value, COUNT(*) AS n,\n"
-            "       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct_of_filtered\n"
-            "FROM {t}\n"
-            "{where}\n"
-            "GROUP BY {g}\n"
-            "ORDER BY n DESC"
-        ).format(g=group_by, t=table, where=where)
+            f"SELECT {group_by} AS group_value, {n} AS n\n"
+            f"FROM {table}\n"
+            f"{where}\n"
+            f"GROUP BY {group_by}\n"
+            f"ORDER BY n DESC, {group_by} ASC"
+        )
         if top_n is not None:
             sql += f"\nLIMIT {int(top_n)}"
 

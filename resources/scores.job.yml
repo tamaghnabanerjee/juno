@@ -1,0 +1,18 @@
+resources:
+  jobs:
+    scores:
+      name: juno-scores
+      tags:
+        project: juno
+      queue:
+        enabled: true
+      performance_target: STANDARD
+      parameters:
+        - name: split
+          default: dev
+        - name: judge_model
+          default: databricks-qwen35-122b-a10b
+      tasks:
+        - task_key: score
+          notebook_task:
+            notebook_path: ../eval/06_score_answers.py
