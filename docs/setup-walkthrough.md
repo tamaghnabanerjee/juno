@@ -161,7 +161,7 @@ declares them; `bundle deploy` makes the workspace match.
 ```bash
 databricks -p JUNO bundle validate      # config correct?
 databricks -p JUNO bundle deploy -t dev # upload files, create/update jobs
-databricks -p JUNO bundle run ingest -t dev
+databricks -p JUNO bundle run data -t dev
 ```
 
 - **Targets** are environments. `dev` runs in *development mode*, which prefixes every job with

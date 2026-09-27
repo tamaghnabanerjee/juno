@@ -1,13 +1,20 @@
 # Design — tagging validation and how Juno is measured
 
+> **Status, 27 September 2026.** This is the design record for checking the LLM's labels
+> (checkpoints 1 and 2), written 20–25 September. The code in `tagger/` follows it and cites its
+> sections. Some parts describe plans that changed later: the answering and judge models in
+> Appendix A were replaced, because every Claude model is rate-limited to zero for real-time calls in
+> this workspace (both approaches use Llama 3.3 70B; the judge is Qwen 3.5 122B), and the
+> measurements in section 9 stop at the trials. The final results and the current design are in the
+> [README](../README.md).
+
 This document extends the design document submitted on 2026-09-17 (`design-doc.pdf`). It does not
 contradict the submission. It makes two things concrete: how the labels that Juno counts are proved
 good enough to count, and how Juno's score is kept separate from the quality of those labels.
 
 It was rewritten on 2026-09-20 to record the decisions the project owner took that day. The body
 refers to AI models by their role. Model names and platform specifics are in Appendix A. The
-calculations behind the judgement numbers are in Appendix B. The last section before the appendices
-lists where the code does not yet do what this document says.
+calculations behind the judgement numbers are in Appendix B.
 
 ## Terms used in this document
 
@@ -533,30 +540,6 @@ Rules that keep this honest:
 - The comparison between Juno and the baseline chatbot stays system against system. Comparing the
   baseline's end-to-end score with Juno's diagnostic score would be meaningless.
 - Section 6 governs what is said when the labels put the target out of reach.
-
-## Where the code does not yet do what this document says
-
-As of 2026-09-20, after the code was brought in line with this document (step 3a of
-`docs/implementation.md`). **Those changes exist on the laptop only.** They are not committed, not
-deployed to the workspace, and have never been run on Databricks. 47 unit tests pass on the laptop.
-
-| What this document says | State of the code |
-|---|---|
-| The trial run uses 1,500 sentences (4.1). | Done. The job and the notebook default to 1,500. |
-| Questions with fewer than 30 sentences in the trial run are not marked (4.2). | Done, in `tagger/checkpoints.py`, with tests including the edge at 29 and 30. |
-| Condition 1 marks the 18 "how many" questions (4.2). | Done. The notebook reads exactly the questions of that kind. |
-| The tagger follows the instructions in `tagger/prompt.py` (8). | Done. The notebook's own copy is gone. Every set of labels records the model and the version of the instructions. |
-| Changes to the instructions can be reviewed (8). | Partly. The first and third versions are kept by name, each with the reason for the change. The second was overwritten before this was set up and cannot be recovered; the file says so. |
-| No dataset sentences in the instructions (8). | Done. A tested function finds any dataset sentence inside the instructions. The notebook runs it on all 5,152 sentences before labelling anything and stops if one is found. It ignores sentences shorter than 25 characters, which would match by accident; 25 is a judgement number. |
-| Checkpoint 2 marks all 18 questions once and its result governs the report (5, 6). | Half done. The full run writes the table `checkpoint2`. The report that reads it is built with the evaluation framework. |
-| The full run cannot happen unless checkpoint 1 passed (2). | Done. There are now two jobs, so a passing trial never starts the full run by itself. The full run refuses to start unless the *latest* trial for the same model, instructions and trial size passed. It no longer labels the trial sentences a second time. |
-| Two models are compared under identical conditions (7). | Done. The trial job is run once per model; each run saves a row to `tagging_trials`; the four-step rule that picks the winner is in `tagger/checkpoints.py` with a test for each step. Both candidates are accepted by the bulk function in this workspace (checked on 2026-09-20), so code to label one sentence at a time is not needed. |
-| The tagger's general quality is reported from the 3,652 untouched sentences (6). | Done. The full run writes `tagging_quality_untouched`. |
-| A sentence that fails must not sink a run. | Done. Failures and unreadable replies are counted and saved with each trial. |
-
-One point is not settled in this document. The test set also has 18 "what share" questions and 18
-"share within a sentiment" questions, which rest on the same 18 counts. Whether they are scored under
-the same 80% target as the "how many" questions has not been decided.
 
 ## Appendix A — model names and platform specifics
 

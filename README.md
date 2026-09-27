@@ -193,6 +193,16 @@ catalog: [infra/README.md](infra/README.md). Unit tests: `.venv/bin/pytest -q`.
 Conversation memory; a chat page; the managed vector-search service; hand-written questions; checking
 the judge against human grades; a second evaluation route through MLflow's evaluation API.
 
+## Documents
+
+| File | What it is |
+|---|---|
+| [docs/walkthrough_video.mov](docs/walkthrough_video.mov) | The 3-minute demo video |
+| [docs/design-doc.pdf](docs/design-doc.pdf) | The design submitted on 17 September 2026 |
+| [docs/design.md](docs/design.md) | The design record for checking the LLM's labels (checkpoints 1 and 2) |
+| [docs/setup-walkthrough.md](docs/setup-walkthrough.md) | How the Azure and Databricks environment was built |
+| [infra/README.md](infra/README.md) | The setup script: what it creates, cost, teardown |
+
 ## Licence
 
 MIT, see [LICENSE](LICENSE). The MEMD-ABSA dataset belongs to its authors and is not included here.
