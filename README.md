@@ -12,6 +12,18 @@ So the comparison is not RAG against an agent. It is answering from a retrieved 
 answering with access to the whole corpus. Both are evaluated on the same frozen test questions.
 Juno's counts are only as accurate as those labels; the results show where that limits it.
 
+## Architecture
+
+![How the data is built: four stages, each its own job, writing tables in Unity Catalog](docs/images/architecture-build.svg)
+
+Four stages build the data, each run as its own Databricks job; they only talk through tables in
+Unity Catalog. Stage 3 decides accuracy: Juno counts `review_facts`, the LLM's labels, not the human labels.
+
+![How one question is answered by each approach and scored](docs/images/architecture-answer.svg)
+
+The highlighted edge is the whole difference: only Juno can call `count_sentences`, which counts
+labels over the full corpus. Both approaches use the same model and the same scoring.
+
 ## The two approaches
 
 | | A. Retrieval only (RAG baseline) | B. Juno: RAG + agent over the full corpus |
@@ -25,18 +37,24 @@ Both return the same fields (answer text, number, unit, ranked categories, cited
 the same scorers apply to both. The LLM never writes SQL: categories and sentiments are chosen from
 fixed allow-lists (`juno/categories.py`) and passed as query parameters.
 
-## Data and labels
+## The pipeline, stage by stage
 
-- **Dataset:** [MEMD-ABSA](https://github.com/NUSTM/MEMD-ABSA) Restaurant (Cai et al., 2023): 5,152
-  English review sentences, human-labelled with (category, sentiment) over 12 categories. Downloaded
-  at run time, never committed (the dataset has no licence file).
-- **Human labels** (`human_labels`, 6,547 rows): the ground truth for every right answer. Juno never
-  reads them.
-- **Tagger labels** (`review_facts`, 6,866 rows): an LLM labelled every sentence in bulk with a
-  versioned prompt (`tagger/prompt.py`). Juno counts these. They were checked against the human labels
-  at two checkpoints before Juno was built (`docs/design.md`).
-- **Embeddings** (`sentence_embeddings`): one 1,024-number embedding per sentence, made once in SQL
-  (`sql/01_sentence_embeddings.sql`); vector search is cosine similarity in SQL.
+Data: [MEMD-ABSA](https://github.com/NUSTM/MEMD-ABSA) Restaurant (Cai et al., 2023), 5,152 English
+review sentences with human labels over 12 categories; downloaded at run time, never committed (the
+dataset has no licence file). All tables live in Unity Catalog, schema `juno.restaurant`.
+
+| Stage | Code | Runs as | Writes (rows) |
+|---|---|---|---|
+| 1. Download and clean | `data_setup/01_ingest.py`, `02_curate.py` | job `juno-data` | `raw_sentences`, `sentences` (5,152), `human_labels` (6,547) |
+| 2. Frozen test questions | `eval/03_build_questions.py`, `question_generator.py` | job `juno-evalset` | `eval_questions` (98: 28 dev, 70 test) |
+| 3. LLM labels every sentence | `tagger/04_tag_sentences.py`, `prompt.py`, `checkpoints.py` | jobs `juno-tagging-trial`, `juno-tagging-full` | `review_facts` (6,866), `checkpoint2` (18), `tagging_trials` |
+| 4. Embeddings | `sql/01_sentence_embeddings.sql` | one SQL statement, run once | `sentence_embeddings` (5,152 × 1,024 numbers) |
+| Answering, A or B | `eval/05_answer_questions.py` with `juno/rag_baseline.py` or `juno/agent.py` | job `juno-answers` | `eval_answers` |
+| Scoring and judge | `eval/06_score_answers.py`, `scorers.py`, `judge.py` | job `juno-scores` | `eval_scores` |
+
+The product code is in `juno/` (`categories.py`, `sql_count_tool.py`, `retrieval.py`,
+`rag_baseline.py`, `agent.py`). The jobs are defined in `databricks.yml` and `resources/`; workspace
+setup is in `infra/` and `sql/`; unit tests are in `tests/`.
 
 ## Results on the 70 test questions
 
@@ -95,6 +113,24 @@ counts on rare categories are rough.
 - **Runs:** `eval/05_answer_questions.py` (job `juno-answers`) writes answers to `eval_answers`;
   `eval/06_score_answers.py` (job `juno-scores`) writes scores to `eval_scores`.
 
+## How it was built
+
+1. A dedicated Azure Databricks workspace and storage, set up by one script; every job defined as code.
+2. The dataset downloaded and split into sentences and human labels (5,152 sentences, ids unique).
+3. 98 test questions generated from templates, right answers by SQL over the human labels, frozen
+   as 28 dev and 70 test.
+4. An LLM labelled every sentence. Trials compared models on the same 1,500 sentences; Claude Opus 4.8
+   won. Its last prompt version reached average F1 0.62 but 6 of 10 counts within 10% (target 8).
+5. Full labelling run; checkpoint 2 showed only 5 of the 13 test count questions within 10% of the
+   human count, the ceiling for Juno's counts, known before Juno was built.
+6. Scope cut to the minimum the course requires; repository reorganised into one folder per stage.
+7. Count tool fixed to count sentences; embeddings made in SQL; retrieval as cosine similarity in SQL.
+8. The planned Claude models were rate-limited to zero here; both approaches moved to Llama 3.3 70B,
+   the judge to Qwen 3.5 122B.
+9. RAG baseline, Juno agent, scorers and judge built, unit-tested, and run on the 28 dev questions;
+   one prompt line fixed comparison answers.
+10. Final run: 70 test questions through each approach once, then scoring. Repository made public.
+
 ## Failures and pivots
 
 | What happened | What changed |
@@ -118,18 +154,6 @@ counts on rare categories are rough.
 - The test questions are generated from templates; no hand-written questions.
 - The judge was not checked against human grades.
 - Juno answers one question at a time; it keeps no conversation memory.
-
-## Repository layout
-
-| Folder | Stage | Main files | Tables written |
-|---|---|---|---|
-| `data_setup/` | Download and clean the dataset | `01_ingest.py`, `02_curate.py` | `raw_sentences`, `sentences`, `human_labels` |
-| `eval/` | Test questions; answering runs; scoring | `03_build_questions.py`, `question_generator.py`, `05_answer_questions.py`, `06_score_answers.py`, `scorers.py`, `judge.py` | `eval_questions`, `eval_answers`, `eval_scores` |
-| `tagger/` | The LLM labels every sentence | `04_tag_sentences.py`, `prompt.py`, `checkpoints.py` | `review_facts`, `checkpoint2`, `tagging_trials` |
-| `juno/` | The product | `categories.py`, `sql_count_tool.py`, `retrieval.py`, `rag_baseline.py`, `agent.py` | none |
-| `resources/`, `databricks.yml` | Databricks Asset Bundle: the jobs | | |
-| `sql/`, `infra/` | Setup: catalog, storage, embeddings | | `sentence_embeddings` |
-| `tests/` | Unit tests (`pytest -q`) | | |
 
 ## Running it
 

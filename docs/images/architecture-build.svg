@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="370" viewBox="0 0 1100 370" role="img" aria-label="Four build stages, each run by its own code, all reading and writing tables in Unity Catalog juno.restaurant."><rect width="1100" height="370" fill="#FFFFFF"/>
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path fill="#1F2A24" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+
+          
+          <rect fill="#F1F3EF" stroke="#1F2A24" stroke-width="1.2" x="12" y="72" width="108" height="86" rx="6"/>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1F2A24" x="24" y="96">GitHub</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="24" y="116">MEMD-ABSA</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="24" y="131">Restaurant</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="24" y="146">3 JSON files</text>
+          <polyline fill="none" stroke="#1F2A24" stroke-width="1.3" points="120,115 143,115" marker-end="url(#a1)"/>
+
+          
+          <rect fill="#F1F3EF" stroke="#1F2A24" stroke-width="1.2" x="145" y="30" width="215" height="192" rx="6"/>
+          <circle fill="#1F2A24" cx="163" cy="52" r="10"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" x="163" y="56" text-anchor="middle">1</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1F2A24" x="180" y="57">Download and clean</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="157" y="84">data_setup/01_ingest.py</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="157" y="100">data_setup/02_curate.py</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="157" y="116">job juno-data · Spark</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="157" y="150">reads</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="157" y="166">the 3 dataset files</text>
+
+          
+          <rect fill="#F1F3EF" stroke="#1F2A24" stroke-width="1.2" x="385" y="30" width="215" height="192" rx="6"/>
+          <circle fill="#1F2A24" cx="403" cy="52" r="10"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" x="403" y="56" text-anchor="middle">2</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1F2A24" x="420" y="57">Frozen test questions</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="397" y="84">eval/03_build_questions.py</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="397" y="100">eval/question_generator.py</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="397" y="116">job juno-evalset · SQL</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="397" y="150">reads</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="397" y="166">human_labels</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="397" y="190">right answers = SQL counts</text>
+
+          
+          <rect fill="#F1F3EF" stroke="#1F2A24" stroke-width="1.2" x="625" y="30" width="215" height="192" rx="6"/>
+          <circle fill="#1F2A24" cx="643" cy="52" r="10"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" x="643" y="56" text-anchor="middle">3</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1F2A24" x="660" y="57">Tagger: LLM labels</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="84">tagger/04_tag_sentences.py</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="100">tagger/prompt.py (v4)</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="116">ai_query bulk · Claude Opus 4.8</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="637" y="150">reads</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="166">sentences</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="181">human_labels (checkpoints)</text>
+
+          
+          <rect fill="#F1F3EF" stroke="#1F2A24" stroke-width="1.2" x="865" y="30" width="215" height="192" rx="6"/>
+          <circle fill="#1F2A24" cx="883" cy="52" r="10"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" x="883" y="56" text-anchor="middle">4</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1F2A24" x="900" y="57">Embeddings</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="877" y="84">sql/01_sentence_embeddings.sql</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="877" y="100">run once, SQL warehouse</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="877" y="116">ai_query · GTE Large (En)</text>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="877" y="150">reads</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="877" y="166">sentences</text>
+
+          
+          <polyline fill="none" stroke="#1F2A24" stroke-width="1.3" points="252,222 252,272" marker-end="url(#a1)"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="260" y="252">writes</text>
+          <polyline fill="none" stroke="#1F2A24" stroke-width="1.3" points="492,222 492,272" marker-end="url(#a1)"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="500" y="252">writes</text>
+          <polyline fill="none" stroke="#1F2A24" stroke-width="1.3" points="732,222 732,272" marker-end="url(#a1)"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="740" y="252">writes</text>
+          <polyline fill="none" stroke="#1F2A24" stroke-width="1.3" points="972,222 972,272" marker-end="url(#a1)"/><text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5E6B64" x="980" y="252">writes</text>
+
+          
+          <rect fill="none" stroke="#D9DED9" stroke-width="1.4" x="145" y="274" width="935" height="84" rx="8"/>
+          <text font-family="IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#5E6B64" x="157" y="294">Unity Catalog · juno.restaurant (Delta tables)</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="11" fill="#1F2A24" x="157" y="318">sentences · 5,152</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="11" fill="#1F2A24" x="157" y="336">human_labels · 6,547</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="11" fill="#1F2A24" x="397" y="318">eval_questions · 98</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="397" y="336">28 dev · 70 test</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="11" fill="#1F2A24" x="637" y="318">review_facts · 6,866</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="637" y="336">checkpoint2 · 18 questions</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="11" fill="#1F2A24" x="877" y="318">sentence_embeddings</text>
+          <text font-family="IBM Plex Mono, Menlo, Consolas, monospace" font-size="10.5" fill="#5E6B64" x="877" y="336">5,152 × 1,024 numbers</text>
+        </svg>
